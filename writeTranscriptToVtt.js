@@ -3,34 +3,49 @@ import path from 'path';
 import { sanitizeFileName } from './tool.js';
 
 let srtIndex = 1;
-let startTimestamp = null; // ✅ will hold first transcript timestamp
+const streamStartTimestamps = new Map(); // Track start timestamp per stream
 
 // 🔧 Set session start (optional external call)
 export function setTranscriptStartTimestamp(ts) {
-  startTimestamp = ts;
-  console.log(`⏱️ Transcript start time set to: ${startTimestamp}`);
+  console.log(`⚠️ setTranscriptStartTimestamp is deprecated - timestamps are now auto-managed per stream`);
+}
+
+// Reset transcript state for a new stream
+export function resetTranscriptForStream(streamId) {
+  const safeStreamId = sanitizeFileName(streamId);
+  streamStartTimestamps.delete(safeStreamId);
+  console.log(`🔄 Reset transcript tracking for stream: ${safeStreamId}`);
+}
+
+// Set the start timestamp for a specific stream
+export function setStreamStartTimestamp(streamId, timestamp) {
+  const safeStreamId = sanitizeFileName(streamId);
+  streamStartTimestamps.set(safeStreamId, timestamp);
+  console.log(`⏱️ Set start timestamp for stream ${safeStreamId}: ${timestamp} (${new Date(timestamp).toISOString()})`);
 }
 
 function formatVttTimestamp(ms) {
-  const date = new Date(ms);
-  if (isNaN(date.getTime())) return '00:00:00.000';
+  if (isNaN(ms) || ms < 0) return '00:00:00.000';
 
-  const h = String(date.getUTCHours()).padStart(2, '0');
-  const m = String(date.getUTCMinutes()).padStart(2, '0');
-  const s = String(date.getUTCSeconds()).padStart(2, '0');
-  const msPart = String(date.getUTCMilliseconds()).padStart(3, '0');
-  return `${h}:${m}:${s}.${msPart}`;
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const msPart = ms % 1000;
+
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(msPart).padStart(3, '0')}`;
 }
 
 function formatSrtTimestamp(ms) {
-  const date = new Date(ms);
-  if (isNaN(date.getTime())) return '00:00:00,000';
+  if (isNaN(ms) || ms < 0) return '00:00:00,000';
 
-  const h = String(date.getUTCHours()).padStart(2, '0');
-  const m = String(date.getUTCMinutes()).padStart(2, '0');
-  const s = String(date.getUTCSeconds()).padStart(2, '0');
-  const msPart = String(date.getUTCMilliseconds()).padStart(3, '0');
-  return `${h}:${m}:${s},${msPart}`;
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const msPart = ms % 1000;
+
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(msPart).padStart(3, '0')}`;
 }
 
 // ✨ Accept meetingFolder as extra parameter
@@ -38,15 +53,18 @@ export function writeTranscriptToVtt(user_name, timestamp, data, streamId) {
 
   const safeStreamId = sanitizeFileName(streamId);
 
-  const meetingFolder= path.join('recordings', safeStreamId);
+  const meetingFolder = path.join('recordings', safeStreamId);
   if (!fs.existsSync(meetingFolder)) {
     fs.mkdirSync(meetingFolder, { recursive: true });
   }
 
-  if (!startTimestamp) {
-    startTimestamp = timestamp; // fallback if not manually set
-    console.log(`⚠️ startTimestamp not set — defaulting to first transcript line: ${startTimestamp}`);
+  // Get or set start timestamp for this stream
+  if (!streamStartTimestamps.has(safeStreamId)) {
+    streamStartTimestamps.set(safeStreamId, timestamp);
+    console.log(`⏱️ First transcript for stream ${safeStreamId} - setting start timestamp: ${timestamp}`);
   }
+
+  const startTimestamp = streamStartTimestamps.get(safeStreamId);
 
   // 🔥 Ensure the meeting folder exists
   if (!fs.existsSync(meetingFolder)) {
@@ -59,6 +77,11 @@ export function writeTranscriptToVtt(user_name, timestamp, data, streamId) {
   const txtFilePath = path.join(meetingFolder, 'transcript.txt');
 
   const relative = timestamp - startTimestamp;
+  console.log(`📊 Timestamp calculation for ${safeStreamId}:`);
+  console.log(`   Current timestamp: ${timestamp} (${new Date(timestamp).toISOString()})`);
+  console.log(`   Start timestamp: ${startTimestamp} (${new Date(startTimestamp).toISOString()})`);
+  console.log(`   Relative time: ${relative}ms = ${Math.floor(relative / 1000)}s`);
+
   const start = formatVttTimestamp(relative);
   const end = formatVttTimestamp(relative + 2000);
   const vttLine = `${start} --> ${end}\n${user_name}: ${data}\n\n`;

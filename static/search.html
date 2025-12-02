@@ -1,516 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meeting Summary Query</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
-      background-color: #f5f5f5;
-    }
-
-    /* Tab styling */
-    .tab-bar {
-      display: flex;
-      margin-bottom: 20px;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .tab-button {
-      padding: 12px 24px;
-      background: none;
-      border: none;
-      border-bottom: 3px solid transparent;
-      cursor: pointer;
-      font-size: 16px;
-      font-weight: 500;
-      color: #666;
-      transition: all 0.3s ease;
-    }
-
-    .tab-button:hover {
-      color: #4285f4;
-      background-color: #f0f0f0;
-    }
-
-    .tab-button.active {
-      color: #4285f4;
-      border-bottom-color: #4285f4;
-      background-color: #f8f9ff;
-    }
-
-    .tab-content {
-      display: none;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-    .container {
-      max-width: 800px;
-      width: 100%;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-    .section {
-      margin-bottom: 40px;
-    }
-    .heading {
-      font-size: 1.5em;
-      margin-bottom: 10px;
-      color: #333;
-    }
-    .search-box {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    input[type="text"], select {
-      flex: 1;
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      outline: none;
-    }
-    input[type="text"]:focus, select:focus {
-      border-color: #4285f4;
-    }
-    button {
-      padding: 12px 24px;
-      font-size: 16px;
-      background-color: #4285f4;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #357ae8;
-    }
-    .results {
-      background-color: white;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 20px;
-      min-height: 200px;
-      max-height: 600px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-    .results h1, .results h2, .results h3 {
-      margin-top: 20px;
-      margin-bottom: 10px;
-      color: #333;
-    }
-    .results h1 {
-      font-size: 1.5em;
-    }
-    .results h2 {
-      font-size: 1.3em;
-    }
-    .results h3 {
-      font-size: 1.2em;
-    }
-    .results p {
-      margin-bottom: 10px;
-      line-height: 1.5;
-    }
-    .results strong {
-      font-weight: bold;
-    }
-    .results em {
-      font-style: italic;
-    }
-    .results ul, .results ol {
-      margin: 10px 0;
-      padding-left: 20px;
-    }
-    .results li {
-      margin-bottom: 5px;
-    }
-    .uuid-section {
-      background-color: #f8f9fa;
-      padding: 8px 12px;
-      border-radius: 4px;
-      margin: 10px 0;
-      font-family: monospace;
-      font-size: 0.9em;
-    }
-    .word-count {
-      margin-top: 20px;
-      font-size: 0.9em;
-      color: #666;
-      text-align: right;
-    }
-    .indented {
-      margin-left: 20px;
-    }
-    .summary-content h3 {
-      color: #fdd;
-      background-color: #333;
-      padding: 8px 12px;
-      margin-top: 20px;
-      margin-bottom: 10px;
-      border-radius: 4px;
-    }
-    .video-container {
-      display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-    video, .transcript {
-      flex: 1;
-      min-width: 300px;
-      background-color: black;
-      border-radius: 4px;
-    }
-    .transcript {
-      background-color: white;
-      color: black;
-      padding: 10px;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    .transcript-line {
-      cursor: pointer;
-      padding: 2px 0;
-    }
-    .transcript-line:hover {
-      background-color: #f0f0f0;
-    }
-
-/* Real-time Dashboard Styles */
-.realtime-dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.rt-row {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.rt-panel {
-  flex: 1;
-  min-width: 300px;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.rt-panel h4 {
-  margin: 0 0 15px 0;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #4285f4;
-  color: #333;
-  font-size: 1.1em;
-}
-
-.rt-transcript-content {
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 12px;
-  height: 300px;
-  overflow-y: auto;
-  font-family: monospace;
-  font-size: 14px;
-  line-height: 1.4;
-  color: #495057;
-}
-
-.rt-dialog-content {
-  background-color: #000080; /* 90s RPG dark blue */
-  color: #00FFFF; /* Cyan text */
-  border: 2px outset #008080; /* Greenish outset border */
-  border-radius: 0; /* Remove round corners for retro look */
-  padding: 15px;
-  height: 200px;
-  overflow-y: auto;
-  font-family: 'Courier New', monospace; /* Monospace font */
-}
-
-.rt-dialog-content p {
-  margin: 0;
-  font-style: italic;
-  color: #856404;
-}
-
-#rt-sentiment-info {
-  font-size: 12px;
-  color: #6c757d;
-  text-align: center;
-}
-
-#rt-query-interface .search-box {
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 0;
-}
-
-#rt-query-interface input,
-#rt-query-interface button {
-  margin-bottom: 0;
-}
-
-/* Connection Status */
-.rt-connection-status {
-  margin-top: 20px;
-  text-align: center;
-}
-
-#rt-connection-status {
-  display: inline-block;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.status-disconnected {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-.status-connected {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.status-connecting {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
-}
-
-
-  </style>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
   <div class="container">
-    <!-- Tab Navigation -->
-    <div class="tab-bar">
-      <button class="tab-button active" data-tab="search-playback">Search and Playback</button>
-      <button class="tab-button" data-tab="summaries">View All Summaries</button>
-      <button class="tab-button" data-tab="realtime">Real-time</button>
-      <button class="tab-button" data-tab="zoom-apps-sdk">Zoom Apps SDK</button>
-    </div>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Dark Mode">
+      <span>🌙</span> Dark Mode
+    </button>
 
     <!-- Tab Content -->
     <div id="search-playback" class="tab-content active">
       <div class="section">
         <div class="heading">Query Meeting Summaries</div>
-        <form>
+        <form action="/search" method="post">
           <div class="search-box">
-            <input type="text" id="query-input" placeholder="Ask questions about your meeting summaries..." required>
+            <input type="text" id="query-input" name="query" placeholder="Search for topics, keywords..." required>
             <button type="submit">Search</button>
           </div>
         </form>
-        <div class="results" id="results"></div>
-      </div>
 
-      <div class="section">
-        <div class="heading">Playback Meeting Video</div>
-        <div class="search-box">
-          <select id="meeting-uuid-select">
-            <option value="">Search above to find playback meetings...</option>
-          </select>
+        <!-- Suggestion Bubbles -->
+        <div class="suggestion-bubbles">
+          <button class="suggestion-chip" data-query="Summarize the meetings today">Summarize the meetings
+            today</button>
+          <button class="suggestion-chip" data-query="What pending action items do I have?">What pending action items do
+            I have</button>
+          <button class="suggestion-chip"
+            data-query="Give me a summary of the conversations we had with customer Jane Doe so far">Summary of Jane Doe
+            conversations</button>
         </div>
-        <div class="video-container">
-          <video id="video-player" controls>
-            <track kind="subtitles" src="" srclang="en" id="vtt-track">
-          </video>
-          <div style="flex: 1; min-width: 300px;">
-            <!-- Speaker Timeline -->
-            <div id="speaker-timeline-container" style="margin-bottom: 20px;">
-              <h4 style="margin: 0 0 10px 0; color: #333; font-size: 1.1em;">Speaker Timeline</h4>
-              <div id="speaker-timeline" style="height: 120px; background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; position: relative;">
-                <div style="position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-size: 12px; color: #666;">Timeline will appear here when transcript is loaded.</div>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loading-spinner" style="display: none;">
+          <div class="spinner"></div>
+          <p>Searching...</p>
+        </div>
+
+        <!-- Search Results (Outside Playback Content) -->
+        <div id="results" class="results"></div>
+
+        <!-- Playback Content (Initially Hidden) -->
+        <div id="playback-content" style="display: none;">
+
+          <div class="search-box" style="margin-bottom: 15px;">
+            <select id="meeting-uuid-select"
+              style="width: 100%; padding: 8px; border-radius: var(--radius); border: 1px solid var(--border-color);">
+              <option value="">Select a meeting to view...</option>
+            </select>
+          </div>
+
+          <h4 style="margin: 20px 0 10px 0; color: var(--text-color); font-size: 16px; font-weight: 600;">📹 Video
+            Player</h4>
+          <div class="video-container" style="margin-bottom: 20px;">
+            <video id="video-player" controls style="width: 100%; border-radius: var(--radius);">
+              <source src="" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+            <track id="vtt-track" kind="subtitles" label="English" srclang="en" default>
+          </div>
+
+          <div id="speaker-timeline-container">
+            <h4 style="margin: 0 0 10px 0; color: var(--text-color); font-size: 14px; font-weight: 600;">Speaker
+              Timeline</h4>
+            <div id="speaker-timeline">
+              <div
+                style="position: absolute; top: 50%; left: 10px; transform: translateY(-50%); font-size: 12px; color: var(--text-secondary);">
+                Timeline will appear here when transcript is loaded.
               </div>
             </div>
-            <!-- Meeting Transcript -->
-            <h4 style="margin: 10px 0 10px 0; color: #333; font-size: 1.1em;">Meeting Transcript</h4>
-            <div class="transcript" id="transcript-text">Transcript will appear here when available.</div>
+          </div>
+
+          <!-- Meeting Transcript -->
+          <h4 style="margin: 0; color: var(--text-color); font-size: 14px; font-weight: 600;">Meeting Transcript</h4>
+          <div class="transcript" id="transcript-text">Transcript will appear here when available.</div>
+
+          <div style="margin: 20px 0 10px 0; text-align: center; display: flex; gap: 10px; justify-content: center;">
+            <button id="summary-button" style="display: none;">📝 Show Meeting Summary</button>
+            <button id="pdf-button" style="display: none; background-color: var(--success-color);">📄 Show Screen Share
+              PDF</button>
+          </div>
+        </div>
+      </div>
+      <!-- Summary Viewer Section -->
+      <div id="summary-section"
+        style="display: none; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h4 style="margin: 0; color: var(--text-color);">Meeting Summary</h4>
+          <button id="hide-summary" style="padding: 6px 12px; background-color: #6c757d; font-size: 12px;">Hide
+            Summary</button>
+        </div>
+        <div id="inline-summary-content" class="results" style="margin-top: 0;"></div>
+      </div>
+
+      <!-- PDF Viewer Section -->
+      <div id="pdf-section"
+        style="display: none; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h4 style="margin: 0; color: var(--text-color);">Screen Share PDF</h4>
+          <button id="hide-pdf" style="padding: 6px 12px; background-color: #6c757d; font-size: 12px;">Hide
+            PDF</button>
+        </div>
+        <iframe id="pdf-iframe"
+          style="width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: var(--radius);"></iframe>
+      </div>
+    </div>
+  </div>
+
+
+
+
+
+
+  <div id="summaries" class="tab-content">
+    <div class="section">
+      <div class="heading">View Meeting Summary</div>
+      <div class="search-box">
+        <select id="summary-select">
+          <option value="">Select a meeting summary...</option>
+        </select>
+      </div>
+      <div class="results" id="summary-results"></div>
+    </div>
+  </div>
+
+  <div id="realtime" class="tab-content">
+    <div class="section">
+      <div class="heading">Real-time Meeting Intelligence Dashboard</div>
+
+      <div class="realtime-dashboard">
+        <div class="rt-row">
+          <!-- Live Transcript (Left) -->
+          <div class="rt-panel transcript-panel">
+            <h4>Live Transcript</h4>
+            <div id="rt-transcript" class="rt-transcript-content">
+
+            </div>
+          </div>
+
+          <!-- Sentiment Analysis (Right) -->
+          <div class="rt-panel sentiment-panel">
+            <h4>Sentiment Analysis</h4>
+            <div id="rt-sentiment-container">
+              <div id="rt-sentiment-chart" style="height: 250px;"></div>
+              <div id="rt-sentiment-info"
+                style="margin-top: 10px; text-align: center; font-size: 12px; color: var(--text-secondary);"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Summary Viewer Section -->
-        <div id="summary-section" style="display: none; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h4 style="margin: 0; color: #333;">Meeting Summary</h4>
-            <button id="hide-summary" style="padding: 5px 10px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Hide Summary</button>
+        <div class="rt-row">
+          <!-- Dialog Suggestions (Left) -->
+          <div class="rt-panel dialog-panel">
+            <h4>Dialog Suggestions</h4>
+            <div id="rt-dialog-suggestions" class="rt-dialog-content">
+
+            </div>
           </div>
-          <div id="inline-summary-content" class="results" style="margin-top: 0;"></div>
+
+          <!-- Real-time Summary (Right) -->
+          <div class="rt-panel summary-panel">
+            <h4>Live Meeting Summary</h4>
+            <div id="rt-summary-content" class="rt-transcript-content">
+              <p>Real-time meeting summary will appear here...</p>
+            </div>
+          </div>
         </div>
 
-        <!-- PDF Viewer Section -->
-        <div id="pdf-section" style="display: none; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h4 style="margin: 0; color: #333;">Screen Share PDF</h4>
-            <button id="hide-pdf" style="padding: 5px 10px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Hide PDF</button>
+        <div class="rt-row">
+          <!-- Meeting Query (Full Width) -->
+          <div class="rt-panel query-panel" style="flex: 1; min-width: 100%;">
+            <h4>Meeting Query</h4>
+            <div id="rt-query-interface">
+              <div class="search-box" style="flex-direction: column; gap: 10px; margin-bottom: 0;">
+                <input type="text" id="rt-query-input" placeholder="Ask about the current meeting..."
+                  style="margin-bottom: 0;">
+                <button id="rt-query-button" style="width: 100%;">Ask AI</button>
+              </div>
+              <!-- Meeting Query Suggestions -->
+              <div class="suggestion-bubbles" style="margin-top: 12px; margin-bottom: 12px;">
+                <button class="suggestion-chip rt-query-chip" data-query="What has been discussed so far?">What has been
+                  discussed so far?</button>
+                <button class="suggestion-chip rt-query-chip" data-query="Was there any mentioned about me?">Was there
+                  any mentioned about me?</button>
+                <button class="suggestion-chip rt-query-chip"
+                  data-query="Can you tell me what did John say about this product?">Can you tell me what did John say
+                  about this product?</button>
+              </div>
+              <!-- Real-time Query Loader -->
+              <div id="rt-loading-spinner" class="loading-spinner" style="display: none; padding: 20px 0;">
+                <div class="spinner" style="width: 24px; height: 24px; border-width: 2px;"></div>
+                <p style="font-size: 12px; margin-top: 8px;">Asking AI...</p>
+              </div>
+              <div id="rt-query-results" class="results" style="margin-top: 16px; min-height: 150px;"></div>
+            </div>
           </div>
-          <iframe id="pdf-iframe" style="width: 100%; height: 600px; border: 1px solid #ddd; border-radius: 4px;"></iframe>
         </div>
+      </div>
 
-        <div style="margin: 20px 0 10px 0; text-align: center; display: flex; gap: 10px; justify-content: center;">
-          <button id="summary-button" style="display: none; padding: 12px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">📝 Show Meeting Summary</button>
-          <button id="pdf-button" style="display: none; padding: 12px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">📄 Show Screen Share PDF</button>
+      <div class="rt-connection-status">
+        <div id="rt-connection-status" class="status-disconnected">
+          🔴 Not Connected
         </div>
       </div>
     </div>
+  </div>
 
-    <div id="summaries" class="tab-content">
-      <div class="section">
-        <div class="heading">View Meeting Summary</div>
-        <div class="search-box">
-          <select id="summary-select">
-            <option value="">Select a meeting summary...</option>
-          </select>
-        </div>
-        <div class="results" id="summary-results"></div>
-      </div>
+  <div id="zoom-sdk" class="tab-content">
+    <div class="section">
+      <div class="heading">Zoom Apps SDK Context Information</div>
+      <div id="zoom-output">Initializing Zoom SDK...</div>
     </div>
 
-    <div id="realtime" class="tab-content">
-      <div class="section">
-        <div class="heading">Real-time Meeting Intelligence Dashboard</div>
-
-        <div class="realtime-dashboard">
-          <div class="rt-row">
-            <!-- Live Transcript (Left) -->
-            <div class="rt-panel transcript-panel">
-              <h4>Live Transcript</h4>
-              <div id="rt-transcript" class="rt-transcript-content">
-               
-              </div>
-            </div>
-
-            <!-- Sentiment Analysis (Right) -->
-            <div class="rt-panel sentiment-panel">
-              <h4>Sentiment Analysis</h4>
-              <div id="rt-sentiment-container">
-                <div id="rt-sentiment-chart" style="height: 250px;"></div>
-                <div id="rt-sentiment-info" style="margin-top: 10px;"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rt-row">
-            <!-- Dialog Suggestions (Left) -->
-            <div class="rt-panel dialog-panel">
-              <h4>Dialog Suggestions</h4>
-              <div id="rt-dialog-suggestions" class="rt-dialog-content">
-               
-              </div>
-            </div>
-
-            <!-- Real-time Summary (Right) -->
-            <div class="rt-panel summary-panel">
-              <h4>Live Meeting Summary</h4>
-              <div id="rt-summary-content" class="rt-transcript-content">
-                <p>Real-time meeting summary will appear here...</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="rt-row">
-            <!-- Meeting Query (Full Width) -->
-            <div class="rt-panel query-panel" style="flex: 1; min-width: 100%;">
-              <h4>Meeting Query</h4>
-              <div id="rt-query-interface">
-                <div class="search-box">
-                  <input type="text" id="rt-query-input" placeholder="Ask about the current meeting..." style="margin-bottom: 10px;">
-                  <button id="rt-query-button" style="width: 100%;">Ask AI</button>
-                </div>
-                <div id="rt-query-results" class="results" style="margin-top: 10px; min-height: 200px;"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="rt-connection-status">
-          <div id="rt-connection-status" class="status-disconnected">
-            🔴 Not Connected
-          </div>
-        </div>
+    <div class="section">
+      <div class="heading">Send Message to Chat</div>
+      <div class="search-box">
+        <input type="text" id="chat-message" placeholder="Enter message to send to chat..." required>
+        <button id="send-chat-button">Send to Chat</button>
       </div>
+      <div id="chat-status"></div>
     </div>
 
-    <div id="zoom-apps-sdk" class="tab-content">
-      <div class="section">
-        <div class="heading">Zoom Apps SDK Context Information</div>
-        <div id="zoom-output">Initializing Zoom SDK...</div>
-      </div>
+    <script>
+      (async () => {
+        // Wait for Zoom SDK to be available
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds max wait
+        while (typeof zoomSdk === 'undefined' && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
 
-      <div class="section">
-        <div class="heading">Send Message to Chat</div>
-        <div class="search-box">
-          <input type="text" id="chat-message" placeholder="Enter message to send to chat..." required>
-          <button id="send-chat-button">Send to Chat</button>
-        </div>
-        <div id="chat-status"></div>
-      </div>
-
-      <script>
-        (async () => {
-          // Wait for Zoom SDK to be available
-          let attempts = 0;
-          const maxAttempts = 50; // 5 seconds max wait
-          while (typeof zoomSdk === 'undefined' && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-          }
-
-          if (typeof zoomSdk === 'undefined') {
-            document.getElementById('zoom-output').innerHTML = `
-              <p style="color: red;">Zoom SDK is undefined. This tab requires the page to be loaded within a Zoom App context.</p>
-              <p style="color: gray;">If you're running this in a Zoom app, ensure the domain is added to the app's Domain Allow List in the Surface tab in Zoom Marketplace settings. Literally add: appssdk.zoom.us/)</p>
+        if (typeof zoomSdk === 'undefined') {
+          document.getElementById('zoom-output').innerHTML = `
+              <p style="color: var(--danger-color);">Zoom SDK is undefined. This tab requires the page to be loaded within a Zoom App context.</p>
+              <p style="color: var(--text-secondary);">If you're running this in a Zoom app, ensure the domain is added to the app's Domain Allow List in the Surface tab in Zoom Marketplace settings. Literally add: appssdk.zoom.us/)</p>
             `;
-            return;
-          }
+          return;
+        }
 
-          try {
-            const configResponse = await zoomSdk.config({
-              version: '1.10.0',
-              capabilities: [
-                'getSupportedJsApis',
-                'getRunningContext',
-                'getMeetingContext',
-                'getUserContext',
-                'getMeetingUUID',
-                'getAppContext',
-                'sendMessageToChat'
-              ]
-            });
+        try {
+          const configResponse = await zoomSdk.config({
+            version: '1.10.0',
+            capabilities: [
+              'getSupportedJsApis',
+              'getRunningContext',
+              'getMeetingContext',
+              'getUserContext',
+              'getMeetingUUID',
+              'getAppContext',
+              'sendMessageToChat'
+            ]
+          });
 
-            const supportedApis = await zoomSdk.getSupportedJsApis();
-            const runningContext = await zoomSdk.getRunningContext();
-            const meetingContext = await zoomSdk.getMeetingContext();
-            const userContext = await zoomSdk.getUserContext();
-            const meetingUUID = await zoomSdk.getMeetingUUID();
-            const appContext = await zoomSdk.getAppContext();
+          const supportedApis = await zoomSdk.getSupportedJsApis();
+          const runningContext = await zoomSdk.getRunningContext();
+          const meetingContext = await zoomSdk.getMeetingContext();
+          const userContext = await zoomSdk.getUserContext();
+          const meetingUUID = await zoomSdk.getMeetingUUID();
+          const appContext = await zoomSdk.getAppContext();
 
-            // Check if sendMessageToChat is supported in current context
-            const canSendToChat = ['inMeeting', 'inChat', 'inMeetingChat'].includes(runningContext);
+          // Check if sendMessageToChat is supported in current context
+          const canSendToChat = ['inMeeting', 'inChat', 'inMeetingChat'].includes(runningContext);
 
-            document.getElementById('zoom-output').innerHTML = `
+          document.getElementById('zoom-output').innerHTML = `
               <h2>Supported JS APIs:</h2>
               <pre>${JSON.stringify(supportedApis, null, 2)}</pre>
 
@@ -530,60 +288,82 @@
               <pre>${JSON.stringify(appContext, null, 2)}</pre>
             `;
 
-            // Update chat section based on context
-            if (!canSendToChat) {
-              document.getElementById('chat-message').disabled = true;
-              document.getElementById('send-chat-button').disabled = true;
-              document.getElementById('chat-status').innerHTML = '<p style="color: orange;">Chat messaging is only available in meeting or chat contexts.</p>';
-            } else {
-              document.getElementById('chat-status').innerHTML = '<p style="color: blue;">Note: Ensure "sendMessageToChat" is enabled in your Zoom app\'s Marketplace capabilities.</p>';
-            }
-          } catch (error) {
-            console.error('Error retrieving Zoom context:', error);
-            document.getElementById('zoom-output').innerHTML = `
-              <p style="color: red;">An error occurred while retrieving Zoom context information.</p>
-              <pre style="color: red;">${error}</pre>
+          // Update chat section based on context
+          if (!canSendToChat) {
+            document.getElementById('chat-message').disabled = true;
+            document.getElementById('send-chat-button').disabled = true;
+            document.getElementById('chat-status').innerHTML = '<p style="color: var(--warning-color);">Chat messaging is only available in meeting or chat contexts.</p>';
+          } else {
+            document.getElementById('chat-status').innerHTML = '<p style="color: var(--primary-color);">Note: Ensure "sendMessageToChat" is enabled in your Zoom app\'s Marketplace capabilities.</p>';
+          }
+        } catch (error) {
+          console.error('Error retrieving Zoom context:', error);
+          document.getElementById('zoom-output').innerHTML = `
+              <p style="color: var(--danger-color);">An error occurred while retrieving Zoom context information.</p>
+              <pre style="color: var(--danger-color);">${error}</pre>
             `;
+        }
+
+        // Handle chat button click
+        document.getElementById('send-chat-button').addEventListener('click', async () => {
+          const rawMessage = document.getElementById('chat-message').value;
+          const message = rawMessage.trim();
+          console.log('Raw message from input:', JSON.stringify(rawMessage));
+          console.log('Trimmed message:', JSON.stringify(message));
+          console.log('Message length:', message.length);
+          console.log('Message truthy:', !!message);
+
+          if (!message) {
+            document.getElementById('chat-status').innerHTML = '<p style="color: var(--danger-color);">Please enter a message.</p>';
+            return;
           }
 
-          // Handle chat button click
-          document.getElementById('send-chat-button').addEventListener('click', async () => {
-            const rawMessage = document.getElementById('chat-message').value;
-            const message = rawMessage.trim();
-            console.log('Raw message from input:', JSON.stringify(rawMessage));
-            console.log('Trimmed message:', JSON.stringify(message));
-            console.log('Message length:', message.length);
-            console.log('Message truthy:', !!message);
+          const statusDiv = document.getElementById('chat-status');
+          statusDiv.innerHTML = 'Sending message...';
 
-            if (!message) {
-              document.getElementById('chat-status').innerHTML = '<p style="color: red;">Please enter a message.</p>';
-              return;
-            }
-
-            const statusDiv = document.getElementById('chat-status');
-            statusDiv.innerHTML = 'Sending message...';
-
-            try {
-              console.log('Calling zoomSdk.sendMessageToChat with:', JSON.stringify(message));
-              await zoomSdk.sendMessageToChat({ message: message });
-              statusDiv.innerHTML = '<p style="color: green;">Message sent successfully!</p>';
-              document.getElementById('chat-message').value = '';
-            } catch (error) {
-              console.error('Error sending message to chat:', error);
-              statusDiv.innerHTML = `<p style="color: red;">Failed to send message: ${error.message}</p>`;
-            }
-          });
-        })();
-      </script>
-    </div>
+          try {
+            console.log('Calling zoomSdk.sendMessageToChat with:', JSON.stringify(message));
+            await zoomSdk.sendMessageToChat({ message: message });
+            statusDiv.innerHTML = '<p style="color: var(--success-color);">Message sent successfully!</p>';
+            document.getElementById('chat-message').value = '';
+          } catch (error) {
+            console.error('Error sending message to chat:', error);
+            statusDiv.innerHTML = `<p style="color: var(--danger-color);">Failed to send message: ${error.message}</p>`;
+          }
+        });
+      })();
+    </script>
+  </div>
+  <!-- Bottom Toolbar Navigation -->
+  <div class="bottom-toolbar">
+    <button class="nav-item active" data-tab="search-playback">
+      <svg viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <span>Search</span>
+    </button>
+    <button class="nav-item" data-tab="realtime">
+      <svg viewBox="0 0 24 24">
+        <line x1="18" y1="20" x2="18" y2="10"></line>
+        <line x1="12" y1="20" x2="12" y2="4"></line>
+        <line x1="6" y1="20" x2="6" y2="14"></line>
+      </svg>
+      <span>Real-time</span>
+    </button>
+    <button class="nav-item" data-tab="zoom-sdk">
+      <svg viewBox="0 0 24 24">
+        <polyline points="16 18 22 12 16 6"></polyline>
+        <polyline points="8 6 2 12 8 18"></polyline>
+      </svg>
+      <span>SDK</span>
+    </button>
+  </div>
   </div>
 
-
-
   <script src="https://appssdk.zoom.us/sdk.js"></script>
-  <script src="static/d3.v7.min.js"></script>
-  <script src="static/search.js"></script>
+  <script src="/static/d3.v7.min.js"></script>
+  <script src="/static/search.js"></script>
 </body>
-</html>
-</body>
+
 </html>

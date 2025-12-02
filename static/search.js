@@ -1,6 +1,41 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // Theme Toggle Logic
+  const themeToggleBtn = document.getElementById('theme-toggle');
+  const htmlElement = document.documentElement;
+  const iconSpan = themeToggleBtn.querySelector('span');
+
+  // Check local storage for saved theme
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    htmlElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+  } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    // Auto-detect system preference
+    htmlElement.setAttribute('data-theme', 'dark');
+    updateThemeIcon('dark');
+  }
+
+  themeToggleBtn.addEventListener('click', () => {
+    const currentTheme = htmlElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+    htmlElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+  });
+
+  function updateThemeIcon(theme) {
+    if (theme === 'dark') {
+      iconSpan.textContent = '☀️';
+      themeToggleBtn.innerHTML = '<span>☀️</span> Light Mode';
+    } else {
+      iconSpan.textContent = '🌙';
+      themeToggleBtn.innerHTML = '<span>🌙</span> Dark Mode';
+    }
+  }
+
   // Tab switching functionality
-  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabButtons = document.querySelectorAll('.nav-item');
   const tabContents = document.querySelectorAll('.tab-content');
 
   tabButtons.forEach(button => {
@@ -40,6 +75,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.querySelector('.section form');
   const queryInput = document.getElementById('query-input');
   const results = document.getElementById('results');
+  const loadingSpinner = document.getElementById('loading-spinner');
+  const playbackContent = document.getElementById('playback-content');
+  // Only select suggestion chips in the search tab to avoid triggering search when clicking real-time chips
+  const suggestionChips = document.querySelectorAll('#search-playback .suggestion-chip');
+
+  // Handle suggestion chip clicks
+  suggestionChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const query = chip.getAttribute('data-query');
+      queryInput.value = query;
+      // Trigger form submission
+      form.dispatchEvent(new Event('submit'));
+    });
+  });
+
+  // Handle real-time query suggestion chip clicks
+  const rtQueryChips = document.querySelectorAll('.rt-query-chip');
+  rtQueryChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const query = chip.getAttribute('data-query');
+      const rtQueryInput = document.getElementById('rt-query-input');
+      const rtQueryButton = document.getElementById('rt-query-button');
+
+      if (rtQueryInput && rtQueryButton) {
+        rtQueryInput.value = query;
+        // Trigger click on the Ask AI button
+        rtQueryButton.click();
+      }
+    });
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -48,9 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
       results.textContent = 'Please enter a query.';
       return;
     }
-    results.textContent = 'Searching...';
+
+    // Show loading state
+    loadingSpinner.style.display = 'flex';
+    playbackContent.style.display = 'none';
+    results.textContent = '';
 
     try {
+      // Simulate a small delay for better UX (optional)
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       const response = await fetch('/search', {
         method: 'POST',
         headers: {
@@ -62,6 +134,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (response.ok) {
         const result = await response.text();
         results.innerHTML = `<div style="white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;">${result}</div>`;
+
+        // Show content and hide loader
+        loadingSpinner.style.display = 'none';
+        playbackContent.style.display = 'block';
+
+        // Scroll to results
+        results.scrollIntoView({ behavior: 'smooth' });
 
         // Extract stream IDs from the result using regex
         const streamIdRegex = /<stream_id>([^<]+)<\/stream_id>/gi;
@@ -96,11 +175,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           console.log('No stream IDs found in response');
         }
+
       } else {
-        results.textContent = 'Error: ' + response.statusText;
+        results.textContent = 'Error performing search.';
+        loadingSpinner.style.display = 'none';
       }
     } catch (error) {
-      results.textContent = 'Error: ' + error.message;
+      console.error('Error:', error);
+      results.textContent = 'An error occurred.';
+      loadingSpinner.style.display = 'none';
     }
   });
 
@@ -134,6 +217,47 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentTranscriptElements = [];
   let timelineSvg = null;
   let availableVideoMeetings = []; // Store filtered meetings from search results
+
+  // Helper function to format meeting summary from XML-like format to HTML
+  const formatMeetingSummary = (summaryText) => {
+    if (!summaryText) return '';
+
+    // Parse XML-like tags and convert to HTML
+    let formatted = summaryText;
+
+    // Extract and format each section
+    const sections = [
+      { tag: 'TOPIC', header: 'Topic', level: 'h2' },
+      { tag: 'DATE', header: 'Date', level: 'h3' },
+      { tag: 'MEETING_UUID', header: 'Meeting UUID', level: 'h3' },
+      { tag: 'STREAM_ID', header: 'Stream ID', level: 'h3' },
+      { tag: 'SUMMARY', header: 'Summary', level: 'h3' },
+      { tag: 'KEY_DECISIONS', header: 'Key Decisions', level: 'h3' },
+      { tag: 'ACTION_ITEMS', header: 'Action Items', level: 'h3' },
+      { tag: 'RISKS_OR_BLOCKERS', header: 'Risks or Blockers', level: 'h3' },
+      { tag: 'SCREEN_SHARE', header: 'Screen Share Analysis', level: 'h3' },
+      { tag: 'ENTITY_DETECTION', header: 'Entity Detection', level: 'h3' }
+    ];
+
+    let htmlOutput = '';
+
+    sections.forEach(({ tag, header, level }) => {
+      const regex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i');
+      const match = summaryText.match(regex);
+
+      if (match && match[1].trim()) {
+        const content = match[1].trim();
+        htmlOutput += `<${level}>${header}</${level}><p>${content}</p>`;
+      }
+    });
+
+    // If no XML tags found, return original text
+    if (!htmlOutput) {
+      return `<p>${summaryText}</p>`;
+    }
+
+    return htmlOutput;
+  };
 
   // Function to parse speaker name from transcript text
   const parseSpeakerName = (text) => {
@@ -200,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .attr('fill', d => colorScale(d.speaker))
       .attr('rx', 2)
       .style('cursor', 'pointer')
-      .on('click', function(event, d) {
+      .on('click', function (event, d) {
         videoPlayer.currentTime = d.start;
       });
 
@@ -346,16 +470,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (previousElementIndex !== -1 && previousElementIndex !== currentElementIndex && previousElementIndex < currentTranscriptElements.length) {
           const prevElement = currentTranscriptElements[previousElementIndex];
           if (prevElement && prevElement.element) {
-            prevElement.element.style.backgroundColor = '';
-            prevElement.element.style.color = '';
+            prevElement.element.classList.remove('active');
           }
         }
 
         if (currentElementIndex !== -1 && currentElementIndex < currentTranscriptElements.length) {
           const currentElement = currentTranscriptElements[currentElementIndex];
           if (currentElement && currentElement.element) {
-            currentElement.element.style.backgroundColor = '#4285f4';
-            currentElement.element.style.color = 'white';
+            currentElement.element.classList.add('active');
 
             // Auto-scroll to keep current line in view
             currentElement.element.scrollIntoView({
@@ -382,17 +504,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Function to create a clickable transcript element
+  // Function to create a clickable transcript element with chat bubble styling
   const createCueElement = (cue, text) => {
-    const div = document.createElement('div');
     // Format the start time for display
     const startTime = new Date(cue.start * 1000).toISOString().substr(11, 8);
-    div.textContent = `[${startTime}] ${text.trim()}`;
-    div.classList.add('transcript-line');
-    div.onclick = () => {
+
+    // Extract speaker name if present (format: "Speaker Name: text")
+    let speaker = 'Unknown Speaker';
+    let message = text.trim();
+    const speakerMatch = text.match(/^([^:]+):\s*(.+)$/);
+    if (speakerMatch) {
+      speaker = speakerMatch[1].trim();
+      message = speakerMatch[2].trim();
+    }
+
+    // Create chat bubble structure (matching real-time transcript)
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'chat-message';
+
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'chat-meta';
+    metaDiv.textContent = `[${startTime}] ${speaker}`;
+
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = 'chat-bubble';
+    bubbleDiv.textContent = message;
+
+    // Make it clickable to seek video
+    messageDiv.onclick = () => {
       videoPlayer.currentTime = cue.start;
     };
-    transcriptDiv.appendChild(div);
+    messageDiv.style.cursor = 'pointer';
+
+    messageDiv.appendChild(metaDiv);
+    messageDiv.appendChild(bubbleDiv);
+    transcriptDiv.appendChild(messageDiv);
   };
 
   // Function to load video and transcript for a given UUID
@@ -472,7 +618,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch(`/meeting-summary/${fileName}`);
       if (response.ok) {
         const content = await response.text();
-        inlineSummaryContent.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace;">${content}</pre>`;
+        inlineSummaryContent.innerHTML = formatMeetingSummary(content);
         summarySection.style.display = 'block';
       } else {
         inlineSummaryContent.innerHTML = 'Summary not available for this meeting.';
@@ -738,6 +884,26 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Sentiment chart updated successfully');
   };
 
+
+
+  // Helper to get live stream ID for a meeting
+  const getLiveStreamId = async (meetingUuid) => {
+    try {
+      console.log('getLiveStreamId called with meetingUuid:', meetingUuid);
+      const response = await fetch(`/api/live-stream?meetingUuid=${meetingUuid}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('getLiveStreamId response:', data);
+        return data.streamId;
+      }
+      console.warn('getLiveStreamId failed with status:', response.status);
+      return null;
+    } catch (error) {
+      console.error('Error fetching live stream ID:', error);
+      return null;
+    }
+  };
+
   // WebSocket connection for real-time dashboard
   const connectRealTimeWebSocket = async (meetingUuid) => {
     try {
@@ -753,11 +919,25 @@ document.addEventListener('DOMContentLoaded', () => {
       // Ensure WebSocket URL has proper protocol
       if (!websocketUrl.startsWith('ws://') && !websocketUrl.startsWith('wss://')) {
         // Default to ws:// for local development, wss:// for remote servers
-        const isLocalhost = websocketUrl.startsWith('localhost') || websocketUrl.startsWith('127.0.0.1') ;
+        const isLocalhost = websocketUrl.startsWith('localhost') || websocketUrl.startsWith('127.0.0.1');
         websocketUrl = (isLocalhost ? 'ws://' : 'wss://') + websocketUrl;
       }
 
-      websocketUrl = `${websocketUrl}?meeting=${encodeURIComponent(meetingUuid || 'global')}`;
+      // Fetch live stream ID
+      const streamId = await getLiveStreamId(meetingUuid || 'global');
+      console.log('Live stream ID:', streamId);
+
+      // Don't connect if there's no active stream
+      if (!streamId) {
+        console.warn('No active stream found, skipping WebSocket connection');
+        const statusEl = document.getElementById('rt-connection-status');
+        statusEl.textContent = '⚫ No Active Stream';
+        statusEl.className = 'status-disconnected';
+        return;
+      }
+
+      // Use streamId for connection
+      websocketUrl = `${websocketUrl}?streamId=${streamId}`;
 
       console.log('Connecting to real-time WebSocket:', websocketUrl);
 
@@ -866,9 +1046,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
           timestamp = 'Unknown Time';
         }
-        const user = data.user ? `${data.user}: ` : '';
-        const newLine = `[${timestamp}] ${user}${data.text}\n`;
-        transcriptDiv.innerHTML += newLine;
+        const user = data.user || 'Unknown Speaker';
+
+        // Create chat bubble structure
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message';
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'chat-meta';
+        metaDiv.textContent = `[${timestamp}] ${user}`;
+
+        const bubbleDiv = document.createElement('div');
+        bubbleDiv.className = 'chat-bubble';
+        bubbleDiv.textContent = data.text;
+
+        messageDiv.appendChild(metaDiv);
+        messageDiv.appendChild(bubbleDiv);
+
+        transcriptDiv.appendChild(messageDiv);
         transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
         break;
 
@@ -889,11 +1084,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update dialog suggestions
         const dialogDiv = document.getElementById('rt-dialog-suggestions');
         if (data.suggestions && data.suggestions.length > 0) {
-        dialogDiv.innerHTML = data.suggestions.map((suggestion, index) =>
-          `<div style="margin-bottom: 10px; border: 3px outset #008080; padding: 8px; background-color: #0000FF;">
-            <strong style="color: #FFFF00;">${index + 1}.</strong> ${suggestion}
-          </div>`
-        ).join('');
+          dialogDiv.innerHTML = `<div class="suggestion-bubbles">
+            ${data.suggestions.map(suggestion =>
+            `<div class="suggestion-chip static">${suggestion}</div>`
+          ).join('')}
+          </div>`;
         } else {
           dialogDiv.innerHTML = '<p>No suggestions available at this time.</p>';
         }
@@ -902,13 +1097,29 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'meeting_summary':
         // Update real-time meeting summary
         const summaryDiv = document.getElementById('rt-summary-content');
-        if (data.summary && data.summary.trim()) {
-          // Display the summary with preserved formatting
-          summaryDiv.innerHTML = data.summary;
-        } else {
-          summaryDiv.innerHTML = '<p>Summary not available yet...</p>';
+        summaryDiv.innerHTML = formatMeetingSummary(data.summary);
+        break;
+
+      case 'stream_ended':
+        console.log('Stream ended event received');
+        const statusEl = document.getElementById('rt-connection-status');
+        statusEl.textContent = '🔴 Meeting Ended';
+        statusEl.className = 'status-disconnected';
+
+        // Clear UI or show ended state
+        const transcriptDivEnded = document.getElementById('rt-transcript');
+        const endMessage = document.createElement('div');
+        endMessage.className = 'chat-message';
+        endMessage.innerHTML = '<div class="chat-meta">System</div><div class="chat-bubble" style="background-color: #f8d7da; color: #721c24;">Meeting has ended.</div>';
+        transcriptDivEnded.appendChild(endMessage);
+        transcriptDivEnded.scrollTop = transcriptDivEnded.scrollHeight;
+
+        // Close WebSocket
+        if (realTimeWebSocket) {
+          realTimeWebSocket.close();
         }
         break;
+
 
       default:
         console.log('Unknown WebSocket message type:', data.type);
@@ -919,8 +1130,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('rt-query-button')?.addEventListener('click', async () => {
     const queryInput = document.getElementById('rt-query-input');
     const resultsDiv = document.getElementById('rt-query-results');
+    const rtLoader = document.getElementById('rt-loading-spinner');
 
-    if (!queryInput || !resultsDiv) return;
+    if (!queryInput || !resultsDiv || !rtLoader) return;
 
     const query = queryInput.value.trim();
     if (!query) {
@@ -928,14 +1140,30 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    resultsDiv.innerHTML = 'Asking AI...';
+    // Show loader, hide results
+    rtLoader.style.display = 'flex';
+    resultsDiv.style.display = 'none';
+    resultsDiv.innerHTML = '';
 
-    const urlMeetingUuid = new URLSearchParams(window.location.search).get('meeting') || 'global';
-    const selectedMeetingUuid = meetingUuidSelect.value || urlMeetingUuid;
-    const configResponse = await fetch('/api/config');
-    const config = await configResponse.json();
-    const defaultMeetingUuid = config.availableMeetings ? config.availableMeetings[0] : 'global';
-    const meetingUuid = selectedMeetingUuid !== 'global' ? selectedMeetingUuid : defaultMeetingUuid;
+    const urlMeetingUuid = new URLSearchParams(window.location.search).get('meeting');
+
+    let meetingUuid = urlMeetingUuid;
+
+    if (!meetingUuid) {
+      try {
+        const configResponse = await fetch('/api/config');
+        const config = await configResponse.json();
+        if (config.availableMeetings && config.availableMeetings.length > 0) {
+          meetingUuid = config.availableMeetings[0];
+        } else {
+          meetingUuid = 'global';
+        }
+      } catch (e) {
+        console.error('Error fetching config:', e);
+        meetingUuid = 'global';
+      }
+    }
+
     console.log('meetinguuid:', meetingUuid);
     console.log('query:', query);
 
@@ -960,10 +1188,19 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error('Query error:', error);
       resultsDiv.innerHTML = 'Error connecting to AI service.';
+    } finally {
+      // Hide loader, show results
+      rtLoader.style.display = 'none';
+      resultsDiv.style.display = 'block';
     }
   });
 
   // Initialize the application - load topics first, then enable functionality
+  // Utility to sanitize filenames (matching backend logic)
+  const sanitizeFileName = (name) => {
+    return name.replace(/[<>:"\/\\|?*=\s]/g, '_');
+  };
+
   const initializeApp = async () => {
     console.log('Initializing application...');
 
@@ -972,13 +1209,127 @@ document.addEventListener('DOMContentLoaded', () => {
     if (topicsLoaded) {
       console.log('Topics loaded successfully - enabling search functionality');
 
-      // Load summary files (don't load ALL video meetings - only from search results)
+      // Load summary files
       loadSummaryFiles();
 
-      // Try to connect to real-time WebSocket with current meeting UUID or global
-      const urlParams = new URLSearchParams(window.location.search);
-      const meetingUuid = urlParams.get('meeting') || 'global';
-      connectRealTimeWebSocket(meetingUuid);
+      // Helper to get meeting context
+      const getMeetingUUID = async () => {
+        let sdkUuid = null;
+
+        // 1. Check Zoom SDK if available (Prioritize SDK as source of truth)
+        if (typeof zoomSdk !== 'undefined') {
+          console.log('Zoom SDK is defined, attempting to get meeting UUID...');
+          try {
+            // Configure the SDK first
+            console.log('Configuring Zoom SDK...');
+            await zoomSdk.config({
+              version: '1.10.0',
+              capabilities: ['getMeetingUUID']
+            });
+            console.log('Zoom SDK configured successfully');
+
+            // Create a promise for the SDK call
+            const sdkPromise = new Promise((resolve) => {
+              try {
+                if (zoomSdk.getMeetingUUID) {
+                  console.log('Calling zoomSdk.getMeetingUUID()...');
+                  zoomSdk.getMeetingUUID().then(result => {
+                    console.log('=== ZOOM SDK RESULT ===');
+                    console.log('Full result object:', JSON.stringify(result, null, 2));
+                    console.log('========================');
+                    // The SDK returns an object like { meetingUUID: "62B0F5/JTyqAw20Ys52NqQ==" }
+                    if (result && result.meetingUUID) {
+                      console.log('✓ Found meetingUUID:', result.meetingUUID);
+                      resolve(result.meetingUUID);
+                    } else {
+                      console.warn('✗ SDK result missing meetingUUID property');
+                      console.warn('Available properties:', Object.keys(result || {}));
+                      resolve(null);
+                    }
+                  }).catch(err => {
+                    console.error('zoomSdk.getMeetingUUID() failed:', err);
+                    resolve(null);
+                  });
+                } else {
+                  console.warn('zoomSdk.getMeetingUUID is not a function');
+                  resolve(null);
+                }
+              } catch (e) {
+                console.error('Error calling zoomSdk.getMeetingUUID:', e);
+                resolve(null);
+              }
+            });
+
+            // Create a timeout promise (increased to 5s)
+            const timeoutPromise = new Promise(resolve => {
+              setTimeout(() => {
+                console.warn('Zoom SDK UUID retrieval timed out');
+                resolve(null);
+              }, 5000);
+            });
+
+            // Race them
+            sdkUuid = await Promise.race([sdkPromise, timeoutPromise]);
+            if (sdkUuid) {
+              console.log('Raw Meeting UUID from SDK:', sdkUuid);
+              const sanitizedSdkUuid = sanitizeFileName(sdkUuid);
+              console.log('Sanitized Meeting UUID from SDK:', sanitizedSdkUuid);
+              return sanitizedSdkUuid;
+            }
+          } catch (e) {
+            console.error('Error accessing Zoom SDK:', e);
+          }
+        } else {
+          console.log('Zoom SDK is undefined');
+        }
+
+        // 2. Check URL if SDK failed or not available
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlMeetingUuid = urlParams.get('meeting');
+        if (urlMeetingUuid) {
+          console.log('Raw Meeting UUID from URL:', urlMeetingUuid);
+          const sanitizedUrlUuid = sanitizeFileName(urlMeetingUuid);
+          console.log('Sanitized Meeting UUID from URL:', sanitizedUrlUuid);
+          return sanitizedUrlUuid;
+        }
+
+        // 3. Mock check for Zoom client (if SDK failed or not found)
+        const isZoomClient = navigator.userAgent.includes('Zoom');
+        if (isZoomClient) {
+          console.log('User Agent indicates Zoom client, but SDK context failed and no URL param.');
+        }
+
+        return null;
+      };
+
+      const meetingUuid = await getMeetingUUID();
+      console.log('Final UUID to be used for lookup:', meetingUuid);
+
+      // If still no UUID, try to get from config (fallback for dev/demo)
+      let finalMeetingUuid = meetingUuid;
+      if (!finalMeetingUuid || finalMeetingUuid === 'global') {
+        console.log('No specific meeting UUID found, checking /api/config for available meetings...');
+        try {
+          const configResponse = await fetch('/api/config');
+          const config = await configResponse.json();
+          if (config.availableMeetings && config.availableMeetings.length > 0) {
+            // Use the first available meeting as default if none specified
+            // This is useful for the demo environment
+            finalMeetingUuid = config.availableMeetings[0];
+            console.log('Using fallback meeting from config:', finalMeetingUuid);
+          } else {
+            console.log('No available meetings in config.');
+          }
+        } catch (e) {
+          console.error('Error fetching config for fallback:', e);
+        }
+      }
+
+      // Final fallback to 'global' if absolutely nothing else works
+      finalMeetingUuid = finalMeetingUuid || 'global';
+      console.log('Final resolved meeting UUID for WebSocket:', finalMeetingUuid);
+
+      connectRealTimeWebSocket(finalMeetingUuid);
 
     } else {
       console.error('Failed to load topics - search functionality may be limited');
@@ -988,6 +1339,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Initialize the application
+  // Start the app
   initializeApp();
+
+  // Collapsible Panels Logic
+  const rtPanels = document.querySelectorAll('.rt-panel h4');
+  rtPanels.forEach(header => {
+    header.addEventListener('click', () => {
+      const panel = header.parentElement;
+      panel.classList.toggle('collapsed');
+    });
+  });
+
+  // Context Awareness - Auto-switch to Real-time tab if in meeting
+  if (typeof zoomSdk !== 'undefined') {
+    zoomSdk.getRunningContext().then(context => {
+      console.log('Running Context:', context);
+      if (context === 'inMeeting' || context === 'inMeetingChat') {
+        // Find the Real-time tab button
+        const realTimeTabBtn = document.querySelector('.nav-item[data-tab="realtime"]');
+        if (realTimeTabBtn) {
+          realTimeTabBtn.click();
+          console.log('Auto-switched to Real-time tab due to in-meeting context');
+        }
+      }
+    }).catch(err => {
+      console.log('Error checking running context:', err);
+    });
+  }
 });

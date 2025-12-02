@@ -8,6 +8,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
+import { resetTranscriptForStream, setStreamStartTimestamp } from './writeTranscriptToVtt.js';
 
 //used for saving audio and video frm RTMS stream
 import { saveRawAudio as saveRawAudioAdvance } from './saveRawAudioAdvance.js';
@@ -137,7 +138,7 @@ app.post(WEBHOOK_PATH, async (req, res) => {
   // Handle RTMS stopped event
   if (event === 'meeting.rtms_stopped') {
     console.log('RTMS Stopped event received');
- 
+
     const { meeting_uuid, rtms_stream_id, server_urls } = payload;
     // Close all active WebSocket connections for the given meeting UUID
     if (activeConnections.has(rtms_stream_id)) {
@@ -151,6 +152,13 @@ app.post(WEBHOOK_PATH, async (req, res) => {
       activeConnections.delete(rtms_stream_id);
     }
 
+    // Broadcast stream ended event to frontend clients connected to this stream
+    broadcastToWebSocketClients({
+      type: 'stream_ended',
+      meeting_uuid: meeting_uuid,
+      stream_id: rtms_stream_id
+    }, rtms_stream_id);
+
     console.log('Starting media conversion for stream: ' + rtms_stream_id);
     await convertMeetingMedia(rtms_stream_id); // Old method (gap-filled, converts individually)
     console.log('Starting audio-video multiplexing for stream: ' + rtms_stream_id);
@@ -158,7 +166,7 @@ app.post(WEBHOOK_PATH, async (req, res) => {
 
     // Generate meeting summary using OpenRouter
     (async () => {
-      const safeStreamID= sanitizeFileName(rtms_stream_id);
+      const safeStreamID = sanitizeFileName(rtms_stream_id);
       console.log('Starting summary generation for stream: ' + rtms_stream_id);
       try {
         const promptTemplate = fs.readFileSync('summary_prompt.md', 'utf-8');
@@ -239,8 +247,16 @@ function connectToSignalingWebSocket(meetingUuid, streamId, serverUrl) {
     activeConnections.set(streamId, {});
   }
   activeConnections.get(streamId).signaling = ws;
-  activeConnections.get(streamId).startTime = Date.now();
+  const streamStartTime = Date.now();
+  activeConnections.get(streamId).startTime = streamStartTime;
+  activeConnections.get(streamId).meetingUuid = meetingUuid;
+  activeConnections.get(streamId).sanitizedMeetingUuid = sanitizeFileName(meetingUuid);
   console.log('Signaling connection stored for cleanup');
+
+  // Set the transcript start timestamp for this stream
+  resetTranscriptForStream(streamId); // Clear any previous data for this stream
+  setStreamStartTimestamp(streamId, streamStartTime);
+  console.log(`⏱️ Set transcript start time for stream ${streamId}: ${streamStartTime} (${new Date(streamStartTime).toISOString()})`);
 
 
   // Function to format timestamp to VTT format (HH:MM:SS.mmm)
@@ -641,7 +657,7 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
           type: 'transcript',
           user: user_name,
           text: data,
-          timestamp: timestamp
+          timestamp: timestamp / 1000
         }, streamId);
 
         // Schedule AI processing (cached, 15-second intervals)
@@ -708,6 +724,52 @@ app.get('/api/config', (req, res) => {
     meetingUuid: meetingUuid,
     availableMeetings: availableMeetings
   });
+});
+
+// GET /api/live-stream - Check if a meeting is currently live and return its stream ID
+app.get('/api/live-stream', (req, res) => {
+  const { meetingUuid } = req.query;
+  console.log('Meeting UUID:', meetingUuid);
+  if (!meetingUuid) {
+    return res.status(400).json({ error: 'Meeting UUID is required' });
+  }
+
+  console.log(`Checking for live stream for meeting UUID: ${meetingUuid}`);
+  console.log('Active connections:', Array.from(activeConnections.entries()).map(([k, v]) => ({
+    streamId: k,
+    meetingUuid: v.meetingUuid,
+    sanitizedStreamId: sanitizeFileName(k)
+  })));
+
+  let foundStreamId = null;
+
+  // Iterate through active connections to find matching meeting UUID or Stream ID
+  for (const [streamId, data] of activeConnections.entries()) {
+    // Check exact meeting UUID match
+    if (data.meetingUuid === meetingUuid) {
+      foundStreamId = streamId;
+      break;
+    }
+    // Check if sanitized meeting UUID matches (in case frontend sends sanitized version)
+    if (data.meetingUuid && sanitizeFileName(data.meetingUuid) === meetingUuid) {
+      foundStreamId = streamId;
+      break;
+    }
+    // Check if the provided UUID is actually the stream ID (or sanitized stream ID)
+    // This handles the fallback case where frontend sends a stream ID from availableMeetings
+    if (streamId === meetingUuid || sanitizeFileName(streamId) === meetingUuid) {
+      foundStreamId = streamId;
+      break;
+    }
+  }
+
+  if (foundStreamId) {
+    console.log(`Found active stream ${foundStreamId} for meeting/stream ${meetingUuid}`);
+    res.json({ streamId: foundStreamId });
+  } else {
+    console.log(`No active stream found for meeting ${meetingUuid}`);
+    res.status(404).json({ streamId: null });
+  }
 });
 
 
@@ -786,7 +848,7 @@ app.post('/search', async (req, res) => {
 
     console.log('Sending response to client');
     // Return the answer
-     res.send(answer);
+    res.send(answer);
     //res.send('<pre>' + answer.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>') + '</pre>');
   } catch (error) {
     console.error('Error in search:', error.message);
@@ -933,7 +995,7 @@ function scheduleAIProcessing(streamId, meetingUuid) {
   const cacheKey = streamId;
   const cache = aiCache.get(cacheKey) || {};
 
-   const safeStreamId= sanitizeFileName(streamId);
+  const safeStreamId = sanitizeFileName(streamId);
 
   // Get configurable interval from environment (default: 15000ms = 15 seconds)
   const aiProcessingInterval = parseInt(process.env.AI_PROCESSING_INTERVAL_MS) || 30000;
@@ -954,26 +1016,11 @@ function scheduleAIProcessing(streamId, meetingUuid) {
 
     const currentVTT = fs.readFileSync(vttPath, 'utf-8');
 
-    // Read events log and screen share images
+    // Read events log (but NOT screen share images for real-time processing)
     const eventsLog = fs.existsSync(`recordings/${safeStreamId}/events.log`) ? fs.readFileSync(`recordings/${safeStreamId}/events.log`, 'utf-8') : '';
 
-    // Read screen share images and convert to base64
-    const processedDir = path.join('recordings', safeStreamId, 'processed', 'jpg');
-    let imageBase64Array = [];
-    if (fs.existsSync(processedDir)) {
-      const imageFiles = fs.readdirSync(processedDir).filter(file => file.endsWith('.jpg'));
-      console.log(`Found ${imageFiles.length} screen share images for real-time summary`);
-      for (const imageFile of imageFiles) {
-        try {
-          const imagePath = path.join(processedDir, imageFile);
-          const imageBuffer = fs.readFileSync(imagePath);
-          const base64Data = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
-          imageBase64Array.push(base64Data);
-        } catch (err) {
-          console.error(`Error reading image ${imageFile} for real-time summary:`, err.message);
-        }
-      }
-    }
+    // Note: Screen share images are NOT processed in real-time loop to avoid expensive image API calls
+    // Images are only processed during final summary generation when stream ends
 
     // Process AI functions with staggered timing to avoid clustering
     (async () => {
@@ -987,9 +1034,9 @@ function scheduleAIProcessing(streamId, meetingUuid) {
         await new Promise(resolve => setTimeout(resolve, aiFunctionStagger));
         const sentimentPromise = aiFunctions.analyzeSentiment(currentVTT);
 
-        // Wait another stagger delay before starting summary generation
+        // Wait another stagger delay before starting summary generation (without images)
         await new Promise(resolve => setTimeout(resolve, aiFunctionStagger));
-        const summaryPromise = aiFunctions.generateRealTimeSummary(currentVTT, eventsLog, imageBase64Array, streamId, meetingUuid);
+        const summaryPromise = aiFunctions.generateRealTimeSummary(currentVTT, eventsLog, [], streamId, meetingUuid);
 
         // Wait for all to complete
         const [dialogSuggestions, sentimentAnalysis, realTimeSummary] = await Promise.all([
@@ -1049,19 +1096,20 @@ function scheduleAIProcessing(streamId, meetingUuid) {
   wss.on('connection', (ws, request) => {
     console.log('🖥️ Client connected to WebSocket server');
 
-    // Extract meeting UUID from query parameters (e.g., ?meeting=uuid123)
+    // Extract meeting UUID and stream ID from query parameters
     const url = new URL(request.url, `ws://localhost:${port}`);
     const meetingUuid = url.searchParams.get('meeting');
+    const streamId = url.searchParams.get('streamId');
 
-    console.log(`Client joined meeting: ${meetingUuid || 'global'}`);
+    console.log(`Client joined meeting: ${meetingUuid || 'global'}, stream: ${streamId || 'none'}`);
 
-    // Store connection by meeting UUID
-    if (meetingUuid) {
-      if (!clientWebSocketConnections.has(meetingUuid)) {
-        clientWebSocketConnections.set(meetingUuid, []);
-      }
-      clientWebSocketConnections.get(meetingUuid).push(ws);
+    // Store connection by stream ID if provided, otherwise by meeting UUID (legacy/fallback)
+    const connectionKey = streamId || meetingUuid || 'global';
+
+    if (!clientWebSocketConnections.has(connectionKey)) {
+      clientWebSocketConnections.set(connectionKey, []);
     }
+    clientWebSocketConnections.get(connectionKey).push(ws);
 
     // Set up keep-alive ping/pong
     const pingInterval = setInterval(() => {
@@ -1089,13 +1137,15 @@ function scheduleAIProcessing(streamId, meetingUuid) {
       console.log(`📴 Client disconnected: ${code} ${reason}`);
 
       // Remove from connection store
-      if (meetingUuid) {
-        const clients = clientWebSocketConnections.get(meetingUuid) || [];
+      // Remove from connection store
+      const connectionKey = streamId || meetingUuid || 'global';
+      if (clientWebSocketConnections.has(connectionKey)) {
+        const clients = clientWebSocketConnections.get(connectionKey);
         const index = clients.indexOf(ws);
         if (index > -1) {
           clients.splice(index, 1);
           if (clients.length === 0) {
-            clientWebSocketConnections.delete(meetingUuid);
+            clientWebSocketConnections.delete(connectionKey);
           }
         }
       }

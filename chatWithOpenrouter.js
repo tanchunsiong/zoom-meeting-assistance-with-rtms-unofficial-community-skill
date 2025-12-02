@@ -15,7 +15,7 @@ const openai = new OpenAI({
  * @param {string} model - The model to use (e.g., 'anthropic/claude-3-haiku')
  * @returns {Promise<string>}
  */
-export async function chatWithOpenRouter(message, model = process.env.OPENROUTER_MODEL || 'openai/gpt-5-chat', images = []) {
+export async function chatWithOpenRouter(message, model = process.env.OPENROUTER_MODEL || 'x-ai/grok-code-fast-1', images = [], isRetry = false) {
 
 
   try {
@@ -44,13 +44,25 @@ export async function chatWithOpenRouter(message, model = process.env.OPENROUTER
 
     return response.choices[0].message.content;
   } catch (err) {
+    const errorMessage = err.response?.data?.error?.message || err.message || '';
     console.error('❌ Error with OpenRouter:', err.response?.data || err.message);
-    // Try falling back to google/gemini-2.0-flash-exp if not already using it
-    if (model !== 'google/gemini-2.5-pro') {
-      console.log('🔄 Retrying with google/gemini-2.5-pro...');
-      return await chatWithOpenRouter(message, 'google/gemini-2.5-pro', images);
+
+    // Check if error is related to image support
+    const isImageSupportError = errorMessage.includes('image') || errorMessage.includes('No endpoints found');
+
+    // If we have images and got an image support error, try google/gemini-2.5-pro (supports vision)
+    if (!isRetry && images.length > 0 && isImageSupportError && model !== 'google/gemini-2.5-pro') {
+      console.log('🔄 Retrying with google/gemini-2.5-pro (supports vision)...');
+      return await chatWithOpenRouter(message, 'google/gemini-2.5-pro', images, true);
     }
-    // If already tried the fallback or fallback also fails, throw the original error
+
+    // Otherwise, retry with moonshotai/kimi-k2 for general errors
+    if (!isRetry && model !== 'moonshotai/kimi-k2' && model !== 'google/gemini-2.5-pro') {
+      console.log('🔄 Retrying with moonshotai/kimi-k2...');
+      return await chatWithOpenRouter(message, 'moonshotai/kimi-k2', images, true);
+    }
+
+    // If retry failed or already using fallback, throw the error
     throw err;
   }
 }
