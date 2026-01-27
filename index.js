@@ -690,11 +690,15 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
         scheduleAIProcessing(streamId, mUuid);
       }
 
-      // Handle chat data
-      if (msg.msg_type === 18 && msg.content && msg.content.data) {
-        let { user_id, user_name, data, timestamp } = msg.content;
-        console.log(`Chat message from ${user_name} (ID: ${user_id}): "${data}"`);
-      }
+       // Handle chat data
+       if (msg.msg_type === 18 && msg.content && msg.content.data) {
+         let { user_id, user_name, data, timestamp } = msg.content;
+         console.log(`Chat message from ${user_name} (ID: ${user_id}): "${data}"`);
+         const safeStreamId = sanitizeFileName(streamId);
+         fs.mkdirSync(`recordings/${safeStreamId}`, { recursive: true });
+         const chatLine = `[${new Date(timestamp).toISOString()}] ${user_name}: ${data}\n`;
+         fs.appendFileSync(`recordings/${safeStreamId}/chat.txt`, chatLine);
+       }
     } catch (err) {
       console.error('Error processing media message:', err);
     }
