@@ -134,7 +134,7 @@ async function generatePDFAndText(streamId) {
     console.log(`Generating PDF for stream ${safeStreamId} with ${session.uniqueFrames.length} frames`);
 
     const processedDir = path.resolve('recordings', safeStreamId, 'processed');
-    const pdfPath = path.join(processedDir, 'approved.pdf');
+    const pdfPath = path.join(processedDir, 'screenshare.pdf');
     const txtPath = path.join(processedDir, 'frames.txt');
 
     // Create PDF with 16:9 aspect ratio (typical monitor) for optimal screen share display

@@ -43,7 +43,7 @@ recordings/                     # Generated meeting data storage
         ├── final_output.mp4     # Final muxed video for playback
         └── processed/           # Sharescreen processing directory
             ├── jpg/             # Individual captured JPEG frames
-            ├── approved.pdf     # Compiled sharescreen PDF with deduplicated frames
+            ├── screenshare.pdf  # Compiled sharescreen PDF with deduplicated frames
             └── frames.txt       # Timestamp log of when screenshare frames appear in the meeting
 meeting_summary/                # LLM-generated meeting summaries
     └── {streamId}.md        # Formatted meeting summary with structured content
