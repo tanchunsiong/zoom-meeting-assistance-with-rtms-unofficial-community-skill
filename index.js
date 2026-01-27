@@ -658,6 +658,13 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
       if (msg.msg_type === 14 && msg.content && msg.content.data) {
 
         let { user_id, user_name, data: audioData, timestamp } = msg.content;
+        
+        // Defensive logging: check for undefined fields
+        if (!user_id || !user_name || !audioData || !timestamp) {
+          console.warn(`⚠️ Missing expected fields in msg_type 14 (audio). Available keys:`, Object.keys(msg.content));
+          console.warn(`⚠️ Values: user_id=${user_id}, user_name=${user_name}, data=${audioData ? 'present' : 'missing'}, timestamp=${timestamp}`);
+        }
+        
         let buffer = Buffer.from(audioData, 'base64');
         //console.log(`Processing audio data for user ${user_name} (ID: ${user_id}), buffer size: ${buffer.length} bytes`);
         saveRawAudioAdvance(buffer, streamId, user_id, Date.now()); // Primary method
@@ -667,6 +674,13 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
       if (msg.msg_type === 15 && msg.content && msg.content.data) {
         let epochMilliseconds = Date.now();
         let { user_id, user_name, data: videoData, timestamp } = msg.content;
+        
+        // Defensive logging: check for undefined fields
+        if (!user_id || !user_name || !videoData || !timestamp) {
+          console.warn(`⚠️ Missing expected fields in msg_type 15 (video). Available keys:`, Object.keys(msg.content));
+          console.warn(`⚠️ Values: user_id=${user_id}, user_name=${user_name}, data=${videoData ? 'present' : 'missing'}, timestamp=${timestamp}`);
+        }
+        
         let buffer = Buffer.from(videoData, 'base64');
         //console.log(`Processing video data for user ${user_name} (ID: ${user_id}), buffer size: ${buffer.length} bytes`);
         saveRawVideoAdvance(buffer, user_name, timestamp, streamId); // Primary method
@@ -675,14 +689,26 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
       if (msg.msg_type === 16 && msg.content && msg.content.data) {
         let epochMilliseconds = Date.now();
         let { user_id, user_name, data: imgData, timestamp } = msg.content;
+        
+        // Defensive logging: check for undefined fields
+        if (!user_id || !user_name || !imgData || !timestamp) {
+          console.warn(`⚠️ Missing expected fields in msg_type 16 (screenshare). Available keys:`, Object.keys(msg.content));
+          console.warn(`⚠️ Values: user_id=${user_id}, user_name=${user_name}, data=${imgData ? 'present' : 'missing'}, timestamp=${timestamp}`);
+        }
+        
         // Call handleShareData to process and save unique screen share images
         handleShareData(imgData, user_id, Date.now(), streamId).catch(err => console.error('Error handling share data:', err));
       }
       // Handle transcript data
       if (msg.msg_type === 17 && msg.content && msg.content.data) {
-        let { user_id, user_name, data, timestamp } = msg.content;
+        let { user_id, user_name, data, timestamp, start_time, end_time, language, attribute } = msg.content;
+        
+        if (!user_id || !user_name || !data || !timestamp) {
+          console.warn(`⚠️ Missing expected fields in msg_type 17 (transcript). Available keys:`, Object.keys(msg.content));
+          console.warn(`⚠️ Values: user_id=${user_id}, user_name=${user_name}, data=${data}, timestamp=${timestamp}`);
+        }
+        
         //console.log(`Processing transcript: "${data}" from user ${user_name} (ID: ${user_id})`);
-        // Write transcript to VTT file
         writeTranscriptToVtt(user_name, timestamp / 1000, data, safestreamId);
 
         const connData = activeConnections.get(streamId);
@@ -693,6 +719,13 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
        // Handle chat data
        if (msg.msg_type === 18 && msg.content && msg.content.data) {
          let { user_id, user_name, data, timestamp } = msg.content;
+         
+         // Defensive logging: check for undefined fields
+         if (!user_id || !user_name || !data || !timestamp) {
+           console.warn(`⚠️ Missing expected fields in msg_type 18 (chat). Available keys:`, Object.keys(msg.content));
+           console.warn(`⚠️ Values: user_id=${user_id}, user_name=${user_name}, data=${data}, timestamp=${timestamp}`);
+         }
+         
          console.log(`Chat message from ${user_name} (ID: ${user_id}): "${data}"`);
          const safeStreamId = sanitizeFileName(streamId);
          fs.mkdirSync(`recordings/${safeStreamId}`, { recursive: true });
