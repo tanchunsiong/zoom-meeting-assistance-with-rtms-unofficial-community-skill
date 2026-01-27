@@ -25,7 +25,8 @@ import { muxFirstAudioVideo } from './muxFirstAudioVideo.js';
 
 import { sanitizeFileName } from './tool.js';
 
-
+// Import Clawdbot AI functions
+import { chatWithClawdbot, chatWithClawdbotFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting, notifyUser } from './chatWithClawdbot.js';
 
 // Load environment variables from a .env file
 dotenv.config();
@@ -142,7 +143,7 @@ app.post(WEBHOOK_PATH, async (req, res) => {
           .replace(/\{\{stream_id\}\}/g, rtms_stream_id)
           .replace(/\{\{TODAYDATE\}\}/g, todayDate);
 
-        const summary = await aiFunctions.chat(filledPrompt, undefined, imageBase64Array);
+         const summary = await chatWithClawdbot(filledPrompt, undefined, imageBase64Array);
         fs.mkdirSync('meeting_summary', { recursive: true });
         fs.writeFileSync(`meeting_summary/${safeStreamID}.md`, summary);
         console.log(`✅ Summary generated and saved for stream ${rtms_stream_id} at meeting_summary/${safeStreamID}.md`);
