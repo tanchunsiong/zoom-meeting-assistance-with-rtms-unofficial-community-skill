@@ -11,7 +11,7 @@ const CLAWDBOT_BIN = process.env.CLAWDBOT_BIN || 'clawdbot';
 const CLAWDBOT_TIMEOUT = parseInt(process.env.CLAWDBOT_TIMEOUT || '120') * 1000;
 
 const NOTIFY_CHANNEL = process.env.CLAWDBOT_NOTIFY_CHANNEL || 'whatsapp';
-const NOTIFY_TARGET = process.env.CLAWDBOT_NOTIFY_TARGET || '+6593632452';
+const NOTIFY_TARGET = process.env.CLAWDBOT_NOTIFY_TARGET || '';
 
 /**
  * Send a message to the Clawdbot owner (you).
@@ -19,6 +19,10 @@ const NOTIFY_TARGET = process.env.CLAWDBOT_NOTIFY_TARGET || '+6593632452';
  * @returns {Promise<boolean>}
  */
 export function notifyUser(message) {
+  if (!NOTIFY_TARGET) {
+    console.warn('⚠️ CLAWDBOT_NOTIFY_TARGET not set in .env. Skipping notification.');
+    return Promise.resolve(false);
+  }
   return new Promise((resolve) => {
     const args = ['message', 'send', '--channel', NOTIFY_CHANNEL, '--target', NOTIFY_TARGET, '--message', message];
     execFile(CLAWDBOT_BIN, args, { timeout: 30000 }, (err) => {
