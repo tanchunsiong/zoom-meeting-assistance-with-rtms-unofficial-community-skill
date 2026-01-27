@@ -1,6 +1,6 @@
 // chatWithClawdbot.js
 import { execFile } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -46,7 +46,7 @@ export function notifyUser(message) {
 function runClawdbot(message, timeout = CLAWDBOT_TIMEOUT) {
   return new Promise((resolve, reject) => {
     const args = ['agent', '--local', '--json', '--message', message];
-    const child = execFile(CLAWDBOT_BIN, args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(CLAWDBOT_BIN, args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         console.error('❌ Clawdbot error:', err.message);
         if (stderr) console.error('stderr:', stderr);
@@ -118,7 +118,7 @@ export async function chatWithClawdbotFast(message) {
  */
 export async function generateDialogSuggestions(transcript) {
   try {
-    const dialogPromptTemplate = readFileSync('query_prompt_dialog_suggestions.md', 'utf-8');
+     const dialogPromptTemplate = readFileSync(join(__dirname, 'query_prompt_dialog_suggestions.md'), 'utf-8');
     const filledPrompt = dialogPromptTemplate.replace(/\{\{meeting_transcript\}\}/g, transcript);
 
     console.log('🗣️ Generating dialog suggestions via Clawdbot...');
@@ -149,7 +149,7 @@ export async function generateDialogSuggestions(transcript) {
  */
 export async function analyzeSentiment(transcript) {
   try {
-    const sentimentPromptTemplate = readFileSync('query_prompt_sentiment_analysis.md', 'utf-8');
+     const sentimentPromptTemplate = readFileSync(join(__dirname, 'query_prompt_sentiment_analysis.md'), 'utf-8');
     const filledPrompt = sentimentPromptTemplate.replace(/\{\{meeting_transcript\}\}/g, transcript);
 
     console.log('😊 Analyzing sentiment via Clawdbot...');
@@ -187,7 +187,7 @@ export async function analyzeSentiment(transcript) {
  */
 export async function generateRealTimeSummary(transcript, meetingEvents = '', imageBase64Array = [], streamId = '', meetingUuid = '') {
   try {
-    const summaryPromptTemplate = readFileSync('summary_prompt.md', 'utf-8');
+     const summaryPromptTemplate = readFileSync(join(__dirname, 'summary_prompt.md'), 'utf-8');
     const todayDate = new Date().toISOString();
 
     const filledPrompt = summaryPromptTemplate
@@ -216,7 +216,7 @@ export async function generateRealTimeSummary(transcript, meetingEvents = '', im
  */
 export async function queryCurrentMeeting(transcript, userQuery) {
   try {
-    const queryPromptTemplate = readFileSync('query_prompt_current_meeting.md', 'utf-8');
+     const queryPromptTemplate = readFileSync(join(__dirname, 'query_prompt_current_meeting.md'), 'utf-8');
     const filledPrompt = queryPromptTemplate
       .replace(/\{\{meeting_transcript\}\}/g, transcript)
       .replace(/\{\{user_query\}\}/g, userQuery);
