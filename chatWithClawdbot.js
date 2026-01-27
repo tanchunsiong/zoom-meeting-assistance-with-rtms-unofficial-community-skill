@@ -1,11 +1,65 @@
 // chatWithClawdbot.js
 import { execFile } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 dotenv.config();
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLAWDBOT_BIN = process.env.CLAWDBOT_BIN || 'clawdbot';
 const CLAWDBOT_TIMEOUT = parseInt(process.env.CLAWDBOT_TIMEOUT || '120') * 1000;
+
+// Load user config for notifications
+let userConfig = {};
+const usersPath = join(__dirname, 'users.json');
+if (existsSync(usersPath)) {
+  try {
+    userConfig = JSON.parse(readFileSync(usersPath, 'utf-8'));
+    console.log(`📋 Loaded ${Object.keys(userConfig).length} user(s) from users.json`);
+  } catch (e) {
+    console.error('❌ Error loading users.json:', e.message);
+  }
+}
+
+/**
+ * Send a message to a user via their configured channel.
+ * Looks up the user's email in users.json for channel + target.
+ * @param {string} email - Zoom user email
+ * @param {string} message - Message to send
+ * @returns {Promise<boolean>} Whether the notification was sent
+ */
+export function notifyUser(email, message) {
+  const user = userConfig[email] || userConfig[email?.toLowerCase()];
+  if (!user) {
+    console.warn(`⚠️ No notification config for ${email}. Add them to users.json.`);
+    return Promise.resolve(false);
+  }
+
+  return new Promise((resolve) => {
+    const args = ['message', 'send', '--channel', user.channel, '--target', user.target, '--message', message];
+    execFile(CLAWDBOT_BIN, args, { timeout: 30000 }, (err, stdout, stderr) => {
+      if (err) {
+        console.error(`❌ Failed to notify ${email}:`, err.message);
+        resolve(false);
+      } else {
+        console.log(`✅ Notified ${email} via ${user.channel}`);
+        resolve(true);
+      }
+    });
+  });
+}
+
+/**
+ * Notify all configured users (e.g., all meeting participants).
+ * @param {string[]} emails - Array of participant emails
+ * @param {string} message - Message to send
+ */
+export async function notifyAllUsers(emails, message) {
+  const results = await Promise.all(emails.map(email => notifyUser(email, message)));
+  const sent = results.filter(Boolean).length;
+  console.log(`📨 Notified ${sent}/${emails.length} users`);
+}
 
 /**
  * Run a clawdbot agent task and return the response text.
