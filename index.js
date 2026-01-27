@@ -31,7 +31,13 @@ import { chatWithClawdbot, chatWithClawdbotFast, generateDialogSuggestions, anal
 // Load environment variables from a .env file
 dotenv.config();
 
+// Runtime notification toggle
+let notificationsEnabled = true;
 
+// AI processing cache for interval-based debouncing
+const aiCache = new Map();
+const AI_PROCESSING_INTERVAL_MS = parseInt(process.env.AI_PROCESSING_INTERVAL_MS || '30000');
+const AI_FUNCTION_STAGGER_MS = parseInt(process.env.AI_FUNCTION_STAGGER_MS || '5000');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -52,6 +58,18 @@ app.use(express.urlencoded({ extended: true }));
 
 // Map to keep track of active WebSocket connections and audio chunks (stream_id -> connection data)
 const activeConnections = new Map();
+
+app.post('/api/notify-toggle', express.json(), (req, res) => {
+  const { enabled } = req.body;
+  if (typeof enabled === 'boolean') {
+    notificationsEnabled = enabled;
+  }
+  res.json({ notificationsEnabled });
+});
+
+app.get('/api/notify-toggle', (req, res) => {
+  res.json({ notificationsEnabled });
+});
 
 
 
@@ -100,6 +118,8 @@ app.post(WEBHOOK_PATH, async (req, res) => {
       }
       activeConnections.delete(rtms_stream_id);
     }
+
+    await notifyUser(`Meeting stream ended: ${rtms_stream_id}`);
 
     console.log('Starting media conversion for stream: ' + rtms_stream_id);
     await convertMeetingMedia(rtms_stream_id); // Old method (gap-filled, converts individually)
@@ -157,6 +177,77 @@ app.post(WEBHOOK_PATH, async (req, res) => {
     })();
   }
 });
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function scheduleAIProcessing(streamId, meetingUuid) {
+  const now = Date.now();
+  const safeStreamId = sanitizeFileName(streamId);
+  const cache = aiCache.get(streamId) || {};
+
+  if (cache.lastUpdated && (now - cache.lastUpdated) < AI_PROCESSING_INTERVAL_MS) {
+    return;
+  }
+
+  if (cache.processing) {
+    return;
+  }
+
+  cache.processing = true;
+  cache.lastUpdated = now;
+  aiCache.set(streamId, cache);
+
+  try {
+    const vttPath = `recordings/${safeStreamId}/transcript.vtt`;
+    const eventsPath = `recordings/${safeStreamId}/events.log`;
+    const transcript = fs.existsSync(vttPath) ? fs.readFileSync(vttPath, 'utf-8') : '';
+    const eventsLog = fs.existsSync(eventsPath) ? fs.readFileSync(eventsPath, 'utf-8') : '';
+
+    if (!transcript || transcript.trim().length < 50) {
+      cache.processing = false;
+      aiCache.set(streamId, cache);
+      return;
+    }
+
+    const outDir = `recordings/${safeStreamId}`;
+    fs.mkdirSync(outDir, { recursive: true });
+
+    const dialogResult = await generateDialogSuggestions(transcript);
+    cache.dialog = dialogResult;
+    fs.writeFileSync(`${outDir}/ai_dialog.json`, JSON.stringify(dialogResult, null, 2));
+    if (notificationsEnabled) {
+      const dialogText = Array.isArray(dialogResult) ? dialogResult.join('\n') : JSON.stringify(dialogResult);
+      await notifyUser(`🗣️ Dialog suggestions:\n${dialogText}`);
+    }
+
+    await sleep(AI_FUNCTION_STAGGER_MS);
+
+    const sentimentResult = await analyzeSentiment(transcript);
+    cache.sentiment = sentimentResult;
+    fs.writeFileSync(`${outDir}/ai_sentiment.json`, JSON.stringify(sentimentResult, null, 2));
+    if (notificationsEnabled) {
+      await notifyUser(`😊 Sentiment update:\n${JSON.stringify(sentimentResult, null, 2)}`);
+    }
+
+    await sleep(AI_FUNCTION_STAGGER_MS);
+
+    const summaryResult = await generateRealTimeSummary(transcript, eventsLog, [], streamId, meetingUuid);
+    cache.summary = summaryResult;
+    fs.writeFileSync(`${outDir}/ai_summary.md`, summaryResult);
+    if (notificationsEnabled) {
+      await notifyUser(`📝 Meeting summary:\n${summaryResult.substring(0, 500)}`);
+    }
+
+    console.log(`✅ AI processing completed for stream ${streamId}`);
+  } catch (err) {
+    console.error(`❌ AI processing error for stream ${streamId}:`, err.message);
+  } finally {
+    cache.processing = false;
+    aiCache.set(streamId, cache);
+  }
+}
 
 // Function to generate a signature for authentication
 function generateSignature(CLIENT_ID, meetingUuid, streamId, CLIENT_SECRET) {
@@ -594,6 +685,9 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
         // Write transcript to VTT file
         writeTranscriptToVtt(user_name, timestamp / 1000, data, safestreamId);
 
+        const connData = activeConnections.get(streamId);
+        const mUuid = connData ? connData.meetingUuid : '';
+        scheduleAIProcessing(streamId, mUuid);
       }
 
       // Handle chat data
