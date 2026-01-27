@@ -52,6 +52,10 @@ async function loadAIProvider() {
     console.log('🔄 Loading DeepSeek provider...');
     const { chatWithDeepSeek, chatWithDeepSeekFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting } = await import('./chatWithDeepSeek.js');
     aiFunctions = { chat: chatWithDeepSeek, chatFast: chatWithDeepSeekFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting };
+  } else if (provider === 'clawdbot') {
+    console.log('🔄 Loading Clawdbot provider...');
+    const { chatWithClawdbot, chatWithClawdbotFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting } = await import('./chatWithClawdbot.js');
+    aiFunctions = { chat: chatWithClawdbot, chatFast: chatWithClawdbotFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting };
   } else {
     console.log('🔄 Loading OpenRouter provider...');
     const { chatWithOpenRouter, chatWithOpenRouterFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting } = await import('./chatWithOpenrouter.js');
