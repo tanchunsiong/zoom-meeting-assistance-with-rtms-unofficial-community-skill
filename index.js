@@ -19,10 +19,6 @@ import { handleShareData, generatePDFAndText } from './saveSharescreen.js';
 
 
 
-//video process with ffmpeg post meeting
-import { convertMeetingMedia } from './convertMeetingMedia.js';
-import { muxFirstAudioVideo } from './muxFirstAudioVideo.js';
-
 import { sanitizeFileName } from './tool.js';
 
 // Import Clawdbot AI functions
@@ -102,80 +98,29 @@ app.post(WEBHOOK_PATH, async (req, res) => {
     connectToSignalingWebSocket(meeting_uuid, rtms_stream_id, server_urls);
   }
 
-  // Handle RTMS stopped event
-  if (event === 'meeting.rtms_stopped') {
-    console.log('RTMS Stopped event received');
+   // Handle RTMS stopped event
+   if (event === 'meeting.rtms_stopped') {
+     console.log('RTMS Stopped event received');
 
-    const { meeting_uuid, rtms_stream_id, server_urls } = payload;
-    // Close all active WebSocket connections for the given meeting UUID
-    if (activeConnections.has(rtms_stream_id)) {
-      const connections = activeConnections.get(rtms_stream_id);
-      console.log('Closing active connections for stream: ' + rtms_stream_id);
-      for (const conn of Object.values(connections)) {
-        if (conn && typeof conn.close === 'function') {
-          conn.close();
-        }
-      }
-      activeConnections.delete(rtms_stream_id);
-    }
+     const { meeting_uuid, rtms_stream_id, server_urls } = payload;
+     // Close all active WebSocket connections for the given meeting UUID
+     if (activeConnections.has(rtms_stream_id)) {
+       const connections = activeConnections.get(rtms_stream_id);
+       console.log('Closing active connections for stream: ' + rtms_stream_id);
+       for (const conn of Object.values(connections)) {
+         if (conn && typeof conn.close === 'function') {
+           conn.close();
+         }
+       }
+       activeConnections.delete(rtms_stream_id);
+     }
 
-    await notifyUser(`Meeting stream ended: ${rtms_stream_id}`);
+     await notifyUser(`Meeting stream ended: ${rtms_stream_id}`);
 
-    console.log('Starting media conversion for stream: ' + rtms_stream_id);
-    await convertMeetingMedia(rtms_stream_id); // Old method (gap-filled, converts individually)
-    console.log('Starting audio-video multiplexing for stream: ' + rtms_stream_id);
-    await muxFirstAudioVideo(rtms_stream_id); // Mux the old conversions
-
-    // Generate meeting summary using OpenRouter
-    (async () => {
-      const safeStreamID = sanitizeFileName(rtms_stream_id);
-      console.log('Starting summary generation for stream: ' + rtms_stream_id);
-      try {
-        const promptTemplate = fs.readFileSync('summary_prompt.md', 'utf-8');
-        const eventsLog = fs.existsSync(`recordings/${safeStreamID}/events.log`) ? fs.readFileSync(`recordings/${safeStreamID}/events.log`, 'utf-8') : '';
-        const transcriptVtt = fs.existsSync(`recordings/${safeStreamID}/transcript.vtt`) ? fs.readFileSync(`recordings/${safeStreamID}/transcript.vtt`, 'utf-8') : '';
-
-        // Read screen share images and convert to base64
-        const processedDir = path.join('recordings', safeStreamID, 'processed', 'jpg');
-        let imageBase64Array = [];
-        if (fs.existsSync(processedDir)) {
-          const imageFiles = fs.readdirSync(processedDir).filter(file => file.endsWith('.jpg'));
-          console.log(`Found ${imageFiles.length} screen share images`);
-          for (const imageFile of imageFiles) {
-            try {
-              const imagePath = path.join(processedDir, imageFile);
-              const imageBuffer = fs.readFileSync(imagePath);
-              const base64Data = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
-              imageBase64Array.push(base64Data);
-            } catch (err) {
-              console.error(`Error reading image ${imageFile}:`, err.message);
-            }
-          }
-        } else {
-          console.log('No screen share images directory found');
-        }
-
-        const todayDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const filledPrompt = promptTemplate
-          .replace(/\{\{raw_transcript\}\}/g, transcriptVtt)
-          .replace(/\{\{meeting_events\}\}/g, eventsLog)
-          .replace(/\{\{meeting_uuid\}\}/g, meeting_uuid)
-          .replace(/\{\{stream_id\}\}/g, rtms_stream_id)
-          .replace(/\{\{TODAYDATE\}\}/g, todayDate);
-
-         const summary = await chatWithClawdbot(filledPrompt, undefined, imageBase64Array);
-        fs.mkdirSync('meeting_summary', { recursive: true });
-        fs.writeFileSync(`meeting_summary/${safeStreamID}.md`, summary);
-        console.log(`✅ Summary generated and saved for stream ${rtms_stream_id} at meeting_summary/${safeStreamID}.md`);
-
-        // Generate PDF from the unique screen share images
-        console.log('Generating PDF from screen share images for stream: ' + rtms_stream_id);
-        await generatePDFAndText(rtms_stream_id);
-      } catch (error) {
-        console.error('❌ Error generating summary:', error.message);
-      }
-    })();
-  }
+     // Generate PDF from the unique screen share images
+     console.log('Generating PDF from screen share images for stream: ' + rtms_stream_id);
+     await generatePDFAndText(rtms_stream_id);
+   }
 });
 
 function sleep(ms) {
