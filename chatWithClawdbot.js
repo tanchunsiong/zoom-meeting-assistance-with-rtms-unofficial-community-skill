@@ -45,7 +45,7 @@ export function notifyUser(message) {
  */
 function runClawdbot(message, timeout = CLAWDBOT_TIMEOUT) {
   return new Promise((resolve, reject) => {
-    const args = ['agent', '--local', '--json', '--message', message];
+    const args = ['agent', '--local', '--json', '--session-id', 'rtms-meeting-assistant', '--message', message];
     execFile(CLAWDBOT_BIN, args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         console.error('❌ Clawdbot error:', err.message);

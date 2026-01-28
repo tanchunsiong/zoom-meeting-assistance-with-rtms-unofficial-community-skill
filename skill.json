@@ -18,6 +18,8 @@
   "clawdbot": {
     "emoji": "🎙️",
     "webhookEvents": ["meeting.rtms_started", "meeting.rtms_stopped"],
+    "forwardPort": 4048,
+    "forwardPath": "/",
     "requires": {
       "env": [
         "ZOOM_SECRET_TOKEN",

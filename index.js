@@ -106,9 +106,10 @@ app.post(WEBHOOK_PATH, async (req, res) => {
      // Close all active WebSocket connections for the given meeting UUID
      if (activeConnections.has(rtms_stream_id)) {
        const connections = activeConnections.get(rtms_stream_id);
+       connections.shouldReconnect = false;
        console.log('Closing active connections for stream: ' + rtms_stream_id);
-       for (const conn of Object.values(connections)) {
-         if (conn && typeof conn.close === 'function') {
+       for (const [key, conn] of Object.entries(connections)) {
+         if (key !== 'shouldReconnect' && conn && typeof conn.close === 'function') {
            conn.close();
          }
        }
@@ -222,7 +223,7 @@ function connectToSignalingWebSocket(meetingUuid, streamId, serverUrl) {
 
   // Store connection for cleanup later
   if (!activeConnections.has(streamId)) {
-    activeConnections.set(streamId, {});
+    activeConnections.set(streamId, { shouldReconnect: true });
   }
   activeConnections.get(streamId).signaling = ws;
   const streamStartTime = Date.now();
@@ -507,8 +508,18 @@ function connectToSignalingWebSocket(meetingUuid, streamId, serverUrl) {
 
   ws.on('close', () => {
     console.log('Signaling socket closed');
-    if (activeConnections.has(streamId)) {
-      delete activeConnections.get(streamId).signaling;
+    const conn = activeConnections.get(streamId);
+    if (conn) {
+      delete conn.signaling;
+      if (conn.shouldReconnect !== false) {
+        console.log(`🔄 Signaling reconnecting in 3000ms...`);
+        setTimeout(() => {
+          const c = activeConnections.get(streamId);
+          if (c && c.shouldReconnect !== false) {
+            connectToSignalingWebSocket(meetingUuid, streamId, serverUrl);
+          }
+        }, 3000);
+      }
     }
   });
 }
@@ -605,7 +616,7 @@ function connectToMediaWebSocket(mediaUrl, meetingUuid, safestreamId, streamId, 
         let { user_id, user_name, data: audioData, timestamp } = msg.content;
         
         // Defensive logging: check for undefined fields
-        if (!user_id || !user_name || !audioData || !timestamp) {
+        if ((user_id === undefined || user_id === null) || !audioData || !timestamp) {
           console.warn(`⚠️ Missing expected fields in msg_type 14 (audio). Available keys:`, Object.keys(msg.content));
           console.warn(`⚠️ Values: user_id=${user_id}, user_name=${user_name}, data=${audioData ? 'present' : 'missing'}, timestamp=${timestamp}`);
         }
