@@ -41,9 +41,7 @@ Set these in the skill's `.env` file:
 - `ZOOM_CLIENT_SECRET` — Zoom app Client Secret
 
 **Optional:**
-- `PORT` — Server port (default: `3000`; skill uses `4048` via `forwardPort` in `skill.json`)
-- `WEBHOOK_PATH` — Webhook endpoint path (default: `/webhook`)
-- `WEBSOCKET_URL` — Public URL for RTMS signaling (e.g. ngrok URL)
+- `PORT` — Server port (default: `3000`)
 - `AI_PROCESSING_INTERVAL_MS` — AI analysis frequency in ms (default: `30000`)
 - `AI_FUNCTION_STAGGER_MS` — Delay between AI calls in ms (default: `5000`)
 - `AUDIO_DATA_OPT` — `1` = mixed stream, `2` = multi-stream (default: `2`)
