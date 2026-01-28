@@ -1,15 +1,22 @@
 ---
 name: zoom-meeting-assistance-rtms-unofficial-community
-description: Zoom RTMS Meeting Assistant — start on-demand to capture meeting audio, video, transcript, screenshare, and chat via Zoom Real-Time Media Streams. Provides AI-powered dialog suggestions, sentiment analysis, and live summaries with WhatsApp notifications. Use when a Zoom RTMS webhook fires or the user asks to record/analyze a meeting.
+description: Zoom RTMS Meeting Assistant — start on-demand to capture meeting audio, video, transcript, screenshare, and chat via Zoom Real-Time Media Streams. Handles meeting.rtms_started and meeting.rtms_stopped webhook events. Provides AI-powered dialog suggestions, sentiment analysis, and live summaries with WhatsApp notifications. Use when a Zoom RTMS webhook fires or the user asks to record/analyze a meeting.
 ---
 
 # Zoom RTMS Meeting Assistant
 
 Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via Clawdbot.
 
+## Webhook Events Handled
+
+This skill processes two Zoom webhook events:
+
+- **`meeting.rtms_started`** — Zoom sends this when RTMS is activated for a meeting. Contains `server_urls`, `rtms_stream_id`, and `meeting_uuid` needed to connect to the RTMS WebSocket.
+- **`meeting.rtms_stopped`** — Zoom sends this when RTMS ends (meeting ended or RTMS disabled). Triggers cleanup: closes WebSocket connections, generates screenshare PDF, sends summary notification.
+
 ## Webhook Dependency
 
-This skill is designed to receive Zoom RTMS webhook events (`meeting.rtms_started`, `meeting.rtms_stopped`). It needs a public webhook endpoint to receive these events from Zoom.
+This skill needs a public webhook endpoint to receive these events from Zoom.
 
 **Preferred:** Use the **ngrok-unofficial-webhook-skill** (`skills/ngrok-unofficial-webhook-skill`). It auto-discovers this skill via `webhookEvents` in `skill.json`, notifies the user, and offers to route events here.
 
