@@ -54,7 +54,13 @@ function runClawdbot(message, timeout = CLAWDBOT_TIMEOUT) {
       }
       try {
         const result = JSON.parse(stdout);
-        resolve(result.reply || result.message || result.content || stdout.trim());
+        // clawdbot agent --json returns { payloads: [{ text }], meta: { ... } }
+        if (result.payloads && Array.isArray(result.payloads)) {
+          const text = result.payloads.map(p => p.text).filter(Boolean).join('\n');
+          resolve(text || stdout.trim());
+        } else {
+          resolve(result.reply || result.message || result.content || stdout.trim());
+        }
       } catch {
         // Not JSON, return raw output
         resolve(stdout.trim());
