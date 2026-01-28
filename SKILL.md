@@ -71,21 +71,60 @@ This starts an Express server listening for Zoom webhook events on `PORT`.
 
 ## Recorded Data
 
-All media saved to `recordings/{streamId}/`:
+All recordings are stored at:
+```
+skills/zoom-meeting-assistance-rtms-unofficial-community/recordings/{streamId}/
+```
 
-| File | Content |
-|------|---------|
-| `transcript.vtt` | VTT format transcript |
-| `transcript.srt` | SRT format transcript |
-| `transcript.txt` | Plain text transcript |
-| `chat.txt` | Chat messages with timestamps |
-| `events.log` | Participant join/leave events |
-| `ai_dialog.json` | AI dialog suggestions |
-| `ai_sentiment.json` | Sentiment analysis per participant |
-| `ai_summary.md` | Real-time meeting summary |
-| `{userId}.raw` | Per-participant raw audio |
-| `combined.h264` | Raw H.264 video |
-| `processed/screenshare.pdf` | Deduplicated screenshare frames as PDF |
+Each stream folder contains:
+
+| File | Content | Searchable |
+|------|---------|-----------|
+| `transcript.txt` | Plain text transcript with timestamps and speaker names | ✅ Best for searching — grep-friendly, one line per utterance |
+| `transcript.vtt` | VTT format transcript with timing cues | ✅ |
+| `transcript.srt` | SRT format transcript | ✅ |
+| `events.log` | Participant join/leave, active speaker changes (JSON lines) | ✅ |
+| `chat.txt` | Chat messages with timestamps | ✅ |
+| `ai_summary.md` | AI-generated meeting summary (markdown) | ✅ Key document — read this first for meeting overview |
+| `ai_dialog.json` | AI dialog suggestions | ✅ |
+| `ai_sentiment.json` | Sentiment analysis per participant | ✅ |
+| `{userId}.raw` | Per-participant raw PCM audio | ❌ Binary |
+| `combined.h264` | Raw H.264 video | ❌ Binary |
+| `processed/screenshare.pdf` | Deduplicated screenshare frames as PDF | ❌ Binary |
+
+Post-meeting summaries may also be saved to:
+```
+skills/zoom-meeting-assistance-rtms-unofficial-community/meeting_summary/
+```
+
+## Searching & Querying Past Meetings
+
+To find and review past meeting data:
+
+```bash
+# List all recorded meetings
+ls recordings/
+
+# Search across all transcripts for a keyword
+grep -rl "keyword" recordings/*/transcript.txt
+
+# Search for what a specific person said
+grep "Chun Siong Tan" recordings/*/transcript.txt
+
+# Read a meeting summary
+cat recordings/<streamId>/ai_summary.md
+
+# Search summaries for a topic
+grep -rl "topic" recordings/*/ai_summary.md
+
+# Check who attended a meeting
+cat recordings/<streamId>/events.log
+
+# Get sentiment for a meeting
+cat recordings/<streamId>/ai_sentiment.json
+```
+
+The `.txt`, `.md`, `.json`, and `.log` files are all text-based and searchable. Start with `ai_summary.md` for a quick overview, then drill into `transcript.txt` for specific quotes or details.
 
 ## API Endpoints
 
