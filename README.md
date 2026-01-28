@@ -1,195 +1,173 @@
-# RTMS Meeting Assistant - Headless Capture Service
+# Zoom RTMS Meeting Assistant
 
-This is a headless Zoom RTMS capture service that records meeting media (audio, video, transcript, screenshare, chat) and provides AI-powered analysis via a local Clawdbot agent with WhatsApp notifications.
+Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via Clawdbot with WhatsApp notifications.
 
-### How It Works
-
-1. **Receive Media via Zoom RTMS**: Utilizes Zoom's Real-Time Media Streams (RTMS) to receive raw transcript, video, audio, screenshare, and chat streams directly from Zoom meetings during active sessions
-2. **Store to Disk**: All media is saved in real-time to `recordings/{streamId}/` for agent/LLM consumption
-3. **AI Processing via Clawdbot**: Local Clawdbot agent analyzes transcripts and generates dialog suggestions, sentiment analysis, and meeting summaries
-4. **WhatsApp Notifications**: Real-time AI results are sent via WhatsApp using `notifyUser()` function
-5. **Agent-Driven**: LLM reads stored files directly from disk and can trigger helper functions (media conversion, muxing) on demand
-
-### File Structure & Purpose
-
-```
-project/
-├── .env                        # API keys & config
-├── summary_prompt.md           # LLM instructions for summarization
-├── query_prompt.md             # LLM instructions for search queries
-├── query_prompt_current_meeting.md  # LLM instructions for current meeting queries
-├── query_prompt_dialog_suggestions.md  # LLM instructions for dialog suggestions
-├── query_prompt_sentiment_analysis.md  # LLM instructions for sentiment analysis
-├── black_frame.h264            # Black frame template for video gap filling
-├── sps_pps_keyframe.h264       # H.264 video headers for stream compatibility
-├── index.js                    # Main RTMS application server & recording logic
-├── chatWithClawdbot.js         # Clawdbot agent integration for AI processing and WhatsApp notifications
-├── muxFirstAudioVideo.js       # Audio/video muxing helper (not auto-triggered)
-├── convertMeetingMedia.js      # FFmpeg conversion helper (not auto-triggered)
-├── saveRawAudioAdvance.js      # Real-time audio stream saving
-├── saveRawVideoAdvance.js      # Real-time video stream saving
-├── writeTranscriptToVtt.js     # Real-time transcript writing in multiple formats
-├── saveSharescreen.js          # Real-time screenshare capture, frame deduplication, and PDF generation
-├── tool.js                     # Utility functions including filename sanitization
-recordings/                     # Generated meeting data storage
-    └── {streamId}/             # Per-meeting directory
-        ├── transcript.vtt      # Real-time transcript (VTT format)
-        ├── transcript.srt      # Real-time transcript (SRT format)
-        ├── transcript.txt      # Real-time transcript (plain text)
-        ├── chat.txt            # Chat messages with timestamps
-        ├── events.log          # Meeting event data (participant join/leave)
-        ├── ai_dialog.json      # AI-generated dialog suggestions
-        ├── ai_sentiment.json   # AI sentiment analysis results
-        ├── ai_summary.md       # AI-generated real-time summary
-        ├── {userId}.raw        # Per-participant raw audio (gaps filled)
-        ├── combined.h264       # Combined raw video with SPS/PPS headers
-        └── processed/          # Sharescreen processing directory
-            ├── jpg/            # Individual captured JPEG frames
-            ├── screenshare.pdf # Compiled sharescreen PDF with deduplicated frames
-            └── frames.txt      # Timestamp log of screenshare frames
-```
-
-## Setup Instructions
-
-### Environment Configuration
-
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit the `.env` file and configure:
-
-**Required:**
-- `ZOOM_SECRET_TOKEN`: Your Zoom webhook secret token
-- `ZOOM_CLIENT_ID`: Your Zoom app client ID
-- `ZOOM_CLIENT_SECRET`: Your Zoom app client secret
-- `CLAWDBOT_BIN`: Path to clawdbot binary (default: `clawdbot`)
-
-**Optional:**
-- `PORT`: Server port (default: 3000)
-- `WEBHOOK_PATH`: Webhook endpoint path (default: `/webhook`)
-- `AI_PROCESSING_INTERVAL_MS`: How frequently AI analyzes meeting data (default: 30000ms = 30 seconds)
-- `AI_FUNCTION_STAGGER_MS`: Delay between AI function calls to prevent clustering (default: 5000ms)
-- `CLAWDBOT_NOTIFY_CHANNEL`: Notification channel (default: `whatsapp`)
-- `CLAWDBOT_NOTIFY_TARGET`: Notification target (default: phone number)
-- `CLAWDBOT_TIMEOUT`: Clawdbot execution timeout in seconds (default: 120)
-
-### Zoom Webhook Configuration
-
-Configure your Zoom app webhook:
-
-- Set the webhook URL to `{domain}/webhook` (e.g., `https://yourdomain.com/webhook`)
-- The service will receive `meeting.rtms_started` and `meeting.rtms_stopped` events
-- Ensure your application is accessible at this endpoint
-
-**Note**: The LLM/agent typically proxies webhook events to this service via POST requests with the RTMS payload.
+> **Unofficial** — This skill is not affiliated with or endorsed by Zoom Video Communications.
 
 ## Features
 
-### Real-Time Recording
+- **Real-time capture** — Audio, video, transcript, screenshare, and chat via RTMS WebSockets
+- **AI analysis** — Dialog suggestions, sentiment analysis, and live summaries via Clawdbot
+- **WhatsApp notifications** — Real-time AI results sent via WhatsApp
+- **Multi-format transcripts** — VTT, SRT, and plain text with timestamps and speaker names
+- **Screenshare PDF** — Deduplicated screenshare frames compiled into a PDF
+- **Per-participant audio** — Raw PCM audio per participant with gap filling
+- **Notification toggle** — Mute/unmute notifications mid-meeting via API
 
-During active meetings, the application saves all media to disk in real time:
+## How It Works
 
-- **Transcripts**: Saved as VTT, SRT, and TXT files with timestamped entries
-- **Chat Messages**: Saved to `chat.txt` with ISO timestamps and user names
-- **Audio**: Raw PCM data per participant in `.raw` files with automatic gap filling
-- **Video**: Raw H.264 video in `combined.h264` with SPS/PPS headers and gap filling using black frames
-- **Screenshare**: Captured as JPEG images with deduplication, compiled into PDF
-- **Events**: Participant activities (join/leave, active speaker) logged with timestamps
+1. **Receive webhook** — Zoom sends `meeting.rtms_started` via the [ngrok webhook skill](https://github.com/tanchunsiong/ngrok-unofficial-webhook-skill)
+2. **Connect to RTMS** — Service connects to Zoom's RTMS WebSocket using the provided stream URLs
+3. **Capture media** — All streams saved in real-time to `recordings/{streamId}/`
+4. **AI processing** — Clawdbot periodically analyzes transcripts for dialog suggestions, sentiment, and summaries
+5. **Meeting ends** — `meeting.rtms_stopped` triggers cleanup, PDF generation, and summary notification
 
-### Real-Time AI Processing
+## Quick Start
 
-During active meetings, Clawdbot continuously processes transcripts to generate:
+### 1. Install dependencies
 
-- **Dialog Suggestions**: Strategic conversation directions for meeting facilitation
-- **Sentiment Analysis**: Real-time assessment of participant sentiment
-- **Meeting Summaries**: Live summarization of ongoing discussions
-
-AI results are:
-- Saved to disk: `ai_dialog.json`, `ai_sentiment.json`, `ai_summary.md`
-- Sent via WhatsApp using `notifyUser()` (if notifications enabled)
-
-### Notification System
-
-The service includes a runtime notification toggle:
-
-- **POST /api/notify-toggle**: Enable/disable notifications
-  ```bash
-  curl -X POST http://localhost:3000/api/notify-toggle \
-    -H "Content-Type: application/json" \
-    -d '{"enabled": false}'
-  ```
-
-- **GET /api/notify-toggle**: Check notification status
-  ```bash
-  curl http://localhost:3000/api/notify-toggle
-  ```
-
-Notifications are sent via WhatsApp through Clawdbot CLI:
 ```bash
-clawdbot message send --channel whatsapp --target +1234567890 --message "Meeting ended"
+cd skills/zoom-meeting-assistance-rtms-unofficial-community
+npm install
 ```
 
-### Post-Meeting Processing
+Requires `ffmpeg` for post-meeting media conversion.
 
-After meetings conclude, the service:
-- Closes all WebSocket connections
-- Generates screenshare PDF from deduplicated frames
-- Sends "Meeting ended" notification via WhatsApp
+### 2. Configure
 
-**Available Helpers** (not auto-triggered, LLM can call manually):
-- `convertMeetingMedia.js`: Convert raw audio/video to WAV/MP4 using FFmpeg
-- `muxFirstAudioVideo.js`: Mux audio and video into final MP4 file
+Copy `.env.example` to `.env` and fill in:
 
-### Data Storage and Reuse
+```env
+ZOOM_SECRET_TOKEN=your_webhook_secret_token
+ZOOM_CLIENT_ID=your_zoom_client_id
+ZOOM_CLIENT_SECRET=your_zoom_client_secret
+CLAWDBOT_NOTIFY_TARGET=+1234567890
+```
 
-All meeting data is stored in `recordings/{streamId}/` for LLM/agent consumption:
+### 3. Start
 
-- **Transcripts**: Multiple formats (VTT, SRT, TXT) for NLP tasks
-- **Chat**: Plain text with timestamps
-- **Audio**: Raw PCM data per participant
-- **Video**: Raw H.264 streams
-- **Screenshare**: JPEG frames + PDF compilation
-- **Event Logs**: Structured participant activity logs
-- **AI Results**: JSON and Markdown files with analysis
+```bash
+node index.js
+```
 
-The LLM reads these files directly from disk to understand meeting content and make decisions.
+The service listens on port 4048 (configurable) for webhook events forwarded by the ngrok skill.
 
-## Customization
+## Environment Variables
 
-### AI Processing Configuration
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `ZOOM_SECRET_TOKEN` | ✅ | — | Zoom webhook secret token |
+| `ZOOM_CLIENT_ID` | ✅ | — | Zoom app Client ID |
+| `ZOOM_CLIENT_SECRET` | ✅ | — | Zoom app Client Secret |
+| `PORT` | — | `3000` | Express server port |
+| `WEBHOOK_PATH` | — | `/webhook` | Webhook endpoint path |
+| `AI_PROCESSING_INTERVAL_MS` | — | `30000` | AI analysis frequency (ms) |
+| `AI_FUNCTION_STAGGER_MS` | — | `5000` | Delay between AI calls (ms) |
+| `CLAWDBOT_BIN` | — | `clawdbot` | Path to Clawdbot binary |
+| `CLAWDBOT_NOTIFY_CHANNEL` | — | `whatsapp` | Notification channel |
+| `CLAWDBOT_NOTIFY_TARGET` | — | — | Phone number / target |
+| `CLAWDBOT_TIMEOUT` | — | `120` | Clawdbot timeout (seconds) |
+| `AUDIO_DATA_OPT` | — | `2` | `1` = mixed audio, `2` = multi-stream |
 
-- `AI_PROCESSING_INTERVAL_MS`: Controls analysis frequency (default: 30 seconds)
-- `AI_FUNCTION_STAGGER_MS`: Delays between AI calls (default: 5 seconds)
+## Recorded Data
 
-### Prompt File Customization
+All recordings stored at `recordings/{streamId}/`:
 
-Customize AI behavior by editing prompt files:
+| File | Content |
+|------|---------|
+| `transcript.txt` | Plain text transcript — best for searching |
+| `transcript.vtt` | VTT format transcript with timing cues |
+| `transcript.srt` | SRT format transcript |
+| `events.log` | Participant join/leave, active speaker (JSON lines) |
+| `chat.txt` | Chat messages with timestamps |
+| `ai_summary.md` | AI-generated meeting summary |
+| `ai_dialog.json` | AI dialog suggestions |
+| `ai_sentiment.json` | Sentiment analysis per participant |
+| `{userId}.raw` | Per-participant raw PCM audio |
+| `combined.h264` | Raw H.264 video |
+| `processed/screenshare.pdf` | Deduplicated screenshare frames as PDF |
 
-- `summary_prompt.md`: Meeting summary generation logic
-- `query_prompt.md`: Query response formatting
-- `query_prompt_current_meeting.md`: Real-time meeting analysis
-- `query_prompt_dialog_suggestions.md`: Conversation facilitation tips
-- `query_prompt_sentiment_analysis.md`: Sentiment scoring logic
+## Searching Past Meetings
+
+```bash
+# List all recorded meetings
+ls recordings/
+
+# Search across all transcripts
+grep -rl "keyword" recordings/*/transcript.txt
+
+# Search what a specific person said
+grep "Name" recordings/*/transcript.txt
+
+# Read a meeting summary
+cat recordings/<streamId>/ai_summary.md
+
+# Check who attended
+cat recordings/<streamId>/events.log
+```
 
 ## API Endpoints
 
-### Webhook
-- `POST /webhook`: Receives Zoom RTMS events (`meeting.rtms_started`, `meeting.rtms_stopped`)
+```bash
+# Toggle WhatsApp notifications on/off
+curl -X POST http://localhost:3000/api/notify-toggle \
+  -H "Content-Type: application/json" -d '{"enabled": false}'
 
-### Notification Control
-- `POST /api/notify-toggle`: Enable/disable WhatsApp notifications
-- `GET /api/notify-toggle`: Get current notification status
+# Check notification status
+curl http://localhost:3000/api/notify-toggle
+```
 
-## Architecture
+## Post-Meeting Helpers
 
-This is a **headless service** designed for agent/LLM consumption:
+Run manually after a meeting ends:
 
-- **No frontend UI** - all data stored to disk for LLM to read
-- **No WebSocket broadcasting** - uses WhatsApp notifications instead
-- **Agent-driven** - LLM orchestrates everything, reads files directly
-- **Clawdbot-only** - single AI provider via local Clawdbot agent
-- **Notification toggle** - LLM can mute/unmute mid-meeting
+```bash
+# Convert raw audio/video to WAV/MP4
+node convertMeetingMedia.js <streamId>
 
-The service receives RTMS connection details via POST (proxied by LLM from Zoom webhook), connects to Zoom's RTMS WebSocket, captures all media, and stores everything to disk for the LLM to process.
+# Mux first audio + video into final MP4
+node muxFirstAudioVideo.js <streamId>
+```
+
+## Prompt Customization
+
+Edit these files to change AI behavior:
+- `summary_prompt.md` — Meeting summary generation
+- `query_prompt.md` — Query response formatting
+- `query_prompt_current_meeting.md` — Real-time meeting analysis
+- `query_prompt_dialog_suggestions.md` — Dialog suggestion style
+- `query_prompt_sentiment_analysis.md` — Sentiment scoring logic
+
+## File Structure
+
+```
+├── .env                        # API keys & config
+├── index.js                    # Main RTMS server & recording logic
+├── chatWithClawdbot.js         # Clawdbot AI integration
+├── convertMeetingMedia.js      # FFmpeg conversion helper
+├── muxFirstAudioVideo.js       # Audio/video muxing helper
+├── saveRawAudioAdvance.js      # Real-time audio stream saving
+├── saveRawVideoAdvance.js      # Real-time video stream saving
+├── writeTranscriptToVtt.js     # Transcript writing (VTT/SRT/TXT)
+├── saveSharescreen.js          # Screenshare capture & PDF generation
+├── summary_prompt.md           # Summary generation prompt
+├── query_prompt*.md            # AI query prompts
+└── recordings/                 # Meeting data storage
+    └── {streamId}/             # Per-meeting directory
+```
+
+## Related Skills
+
+- **[ngrok-unofficial-webhook-skill](https://github.com/tanchunsiong/ngrok-unofficial-webhook-skill)** — Public webhook endpoint (required to receive Zoom events)
+- **[zoom-unofficial-community-skill](https://github.com/tanchunsiong/zoom-unofficial-community-skill)** — Zoom REST API CLI (can start/stop RTMS via `meetings rtms-start/stop`)
+
+## Bug Reports & Contributing
+
+Found a bug? Please raise an issue at:
+👉 https://github.com/tanchunsiong/zoom-meeting-assistance-with-rtms-unofficial-community-skill/issues
+
+Pull requests are also welcome!
+
+## License
+
+MIT

@@ -1,6 +1,6 @@
 {
   "name": "zoom-meeting-assistance-rtms-unofficial-community",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zoom RTMS Meeting Assistant — on-demand capture and AI analysis of Zoom meetings via Real-Time Media Streams. Records audio, video, transcript, screenshare, and chat with live AI summaries and WhatsApp notifications.",
   "author": "tanchunsiong",
   "license": "MIT",

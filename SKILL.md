@@ -41,7 +41,7 @@ Set these in the skill's `.env` file:
 - `ZOOM_CLIENT_SECRET` — Zoom app Client Secret
 
 **Optional:**
-- `PORT` — Server port (default: `3000`)
+- `PORT` — Server port (default: `3000`; skill uses `4048` via `forwardPort` in `skill.json`)
 - `WEBHOOK_PATH` — Webhook endpoint path (default: `/webhook`)
 - `WEBSOCKET_URL` — Public URL for RTMS signaling (e.g. ngrok URL)
 - `AI_PROVIDER` — AI provider: `openrouter`, `gemma`, `qwen`, `deepseek` (default: `gemma`)
