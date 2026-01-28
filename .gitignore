@@ -47,5 +47,5 @@ debug.logß
 recordings/*
 !recordings/.gitkeep
 
-meeting_summary/*
-!meeting_summary/.gitkeep
+summaries/*
+!summaries/.gitkeep
