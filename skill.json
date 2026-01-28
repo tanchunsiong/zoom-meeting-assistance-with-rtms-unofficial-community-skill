@@ -17,6 +17,7 @@
   ],
   "clawdbot": {
     "emoji": "🎙️",
+    "webhookEvents": ["meeting.rtms_started", "meeting.rtms_stopped"],
     "requires": {
       "env": [
         "ZOOM_SECRET_TOKEN",
