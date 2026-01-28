@@ -7,6 +7,14 @@ description: Zoom RTMS Meeting Assistant — start on-demand to capture meeting 
 
 Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via Clawdbot.
 
+## Webhook Dependency
+
+This skill is designed to receive Zoom RTMS webhook events (`meeting.rtms_started`, `meeting.rtms_stopped`). It needs a public webhook endpoint to receive these events from Zoom.
+
+**Preferred:** Use the **ngrok-unofficial-webhook-skill** (`skills/ngrok-unofficial-webhook-skill`). It auto-discovers this skill via `webhookEvents` in `skill.json`, notifies the user, and offers to route events here.
+
+Other webhook solutions (e.g. custom servers, cloud functions) will work but require additional integration to forward payloads to this service.
+
 ## Prerequisites
 
 ```bash
