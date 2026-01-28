@@ -179,9 +179,16 @@ cat recordings/YYYY/MM/DD/<streamId>/ai_sentiment.json
 
 ## Prompt Customization
 
+Want different summary styles or analysis? Customize the AI prompts to fit your needs!
+
 Edit these files to change AI behavior:
-- `summary_prompt.md` — Meeting summary generation
-- `query_prompt.md` — Query response formatting
-- `query_prompt_current_meeting.md` — Real-time meeting analysis
-- `query_prompt_dialog_suggestions.md` — Dialog suggestion style
-- `query_prompt_sentiment_analysis.md` — Sentiment scoring logic
+
+| File | Purpose | Example Customizations |
+|------|---------|----------------------|
+| `summary_prompt.md` | Meeting summary generation | Bullet points vs prose, focus areas, length |
+| `query_prompt.md` | Query response formatting | Response style, detail level |
+| `query_prompt_current_meeting.md` | Real-time meeting analysis | What to highlight during meetings |
+| `query_prompt_dialog_suggestions.md` | Dialog suggestion style | Formal vs casual, suggestion count |
+| `query_prompt_sentiment_analysis.md` | Sentiment scoring logic | Custom sentiment categories, thresholds |
+
+**Tip:** Back up the originals before editing, so you can revert if needed.
