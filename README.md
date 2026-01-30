@@ -1,13 +1,15 @@
 # Zoom RTMS Meeting Assistant
 
-Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via Clawdbot with WhatsApp notifications.
+Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via OpenClaw with WhatsApp notifications.
 
 > **Unofficial** — This skill is not affiliated with or endorsed by Zoom Video Communications.
+
+> **Requires [OpenClaw](https://github.com/openclaw/openclaw)** — This skill uses the OpenClaw CLI for AI processing and notifications.
 
 ## Features
 
 - **Real-time capture** — Audio, video, transcript, screenshare, and chat via RTMS WebSockets
-- **AI analysis** — Dialog suggestions, sentiment analysis, and live summaries via Clawdbot
+- **AI analysis** — Dialog suggestions, sentiment analysis, and live summaries via OpenClaw
 - **WhatsApp notifications** — Real-time AI results sent via WhatsApp
 - **Multi-format transcripts** — VTT, SRT, and plain text with timestamps and speaker names
 - **Screenshare PDF** — Deduplicated screenshare frames compiled into a PDF
@@ -19,7 +21,7 @@ Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS).
 1. **Receive webhook** — Zoom sends `meeting.rtms_started` via the [ngrok webhook skill](https://github.com/tanchunsiong/ngrok-unofficial-webhook-skill)
 2. **Connect to RTMS** — Service connects to Zoom's RTMS WebSocket using the provided stream URLs
 3. **Capture media** — All streams saved in real-time to `recordings/{streamId}/`
-4. **AI processing** — Clawdbot periodically analyzes transcripts for dialog suggestions, sentiment, and summaries
+4. **AI processing** — OpenClaw periodically analyzes transcripts for dialog suggestions, sentiment, and summaries
 5. **Meeting ends** — `meeting.rtms_stopped` triggers cleanup, PDF generation, and summary notification
 
 ## Quick Start
@@ -41,7 +43,7 @@ Copy `.env.example` to `.env` and fill in:
 ZOOM_SECRET_TOKEN=your_webhook_secret_token
 ZOOM_CLIENT_ID=your_zoom_client_id
 ZOOM_CLIENT_SECRET=your_zoom_client_secret
-CLAWDBOT_NOTIFY_TARGET=+1234567890
+OPENCLAW_NOTIFY_TARGET=+1234567890
 ```
 
 ### 3. Start
@@ -63,10 +65,10 @@ The service listens on port 4048 (configurable) for webhook events forwarded by 
 | `WEBHOOK_PATH` | — | `/webhook` | Webhook endpoint path |
 | `AI_PROCESSING_INTERVAL_MS` | — | `30000` | AI analysis frequency (ms) |
 | `AI_FUNCTION_STAGGER_MS` | — | `5000` | Delay between AI calls (ms) |
-| `CLAWDBOT_BIN` | — | `clawdbot` | Path to Clawdbot binary |
-| `CLAWDBOT_NOTIFY_CHANNEL` | — | `whatsapp` | Notification channel |
-| `CLAWDBOT_NOTIFY_TARGET` | — | — | Phone number / target |
-| `CLAWDBOT_TIMEOUT` | — | `120` | Clawdbot timeout (seconds) |
+| `OPENCLAW_BIN` | — | `openclaw` | Path to OpenClaw binary |
+| `OPENCLAW_NOTIFY_CHANNEL` | — | `whatsapp` | Notification channel |
+| `OPENCLAW_NOTIFY_TARGET` | — | — | Phone number / target |
+| `OPENCLAW_TIMEOUT` | — | `120` | OpenClaw timeout (seconds) |
 | `AUDIO_DATA_OPT` | — | `2` | `1` = mixed audio, `2` = multi-stream |
 
 ## Recorded Data
@@ -143,7 +145,7 @@ Edit these files to change AI behavior:
 ```
 ├── .env                        # API keys & config
 ├── index.js                    # Main RTMS server & recording logic
-├── chatWithClawdbot.js         # Clawdbot AI integration
+├── chatWithClawdbot.js         # OpenClaw AI integration
 ├── convertMeetingMedia.js      # FFmpeg conversion helper
 ├── muxFirstAudioVideo.js       # Audio/video muxing helper
 ├── saveRawAudioAdvance.js      # Real-time audio stream saving

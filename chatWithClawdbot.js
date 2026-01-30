@@ -1,4 +1,4 @@
-// chatWithClawdbot.js
+// chatWithClawdbot.js (OpenClaw AI integration - filename kept for backwards compatibility)
 import { execFile } from 'child_process';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
@@ -7,25 +7,25 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CLAWDBOT_BIN = process.env.CLAWDBOT_BIN || 'clawdbot';
-const CLAWDBOT_TIMEOUT = parseInt(process.env.CLAWDBOT_TIMEOUT || '120') * 1000;
+const OPENCLAW_BIN = process.env.OPENCLAW_BIN || 'openclaw';
+const OPENCLAW_TIMEOUT = parseInt(process.env.OPENCLAW_TIMEOUT || '120') * 1000;
 
-const NOTIFY_CHANNEL = process.env.CLAWDBOT_NOTIFY_CHANNEL || 'whatsapp';
-const NOTIFY_TARGET = process.env.CLAWDBOT_NOTIFY_TARGET || '';
+const NOTIFY_CHANNEL = process.env.OPENCLAW_NOTIFY_CHANNEL || 'whatsapp';
+const NOTIFY_TARGET = process.env.OPENCLAW_NOTIFY_TARGET || '';
 
 /**
- * Send a message to the Clawdbot owner (you).
+ * Send a message to the OpenClaw owner (you).
  * @param {string} message - Message to send
  * @returns {Promise<boolean>}
  */
 export function notifyUser(message) {
   if (!NOTIFY_TARGET) {
-    console.warn('⚠️ CLAWDBOT_NOTIFY_TARGET not set in .env. Skipping notification.');
+    console.warn('⚠️ OPENCLAW_NOTIFY_TARGET not set in .env. Skipping notification.');
     return Promise.resolve(false);
   }
   return new Promise((resolve) => {
     const args = ['message', 'send', '--channel', NOTIFY_CHANNEL, '--target', NOTIFY_TARGET, '--message', message];
-    execFile(CLAWDBOT_BIN, args, { timeout: 30000 }, (err) => {
+    execFile(OPENCLAW_BIN, args, { timeout: 30000 }, (err) => {
       if (err) {
         console.error('❌ Failed to notify:', err.message);
         resolve(false);
@@ -38,23 +38,23 @@ export function notifyUser(message) {
 }
 
 /**
- * Run a clawdbot agent task and return the response text.
+ * Run an openclaw agent task and return the response text.
  * @param {string} message - The prompt/message
  * @param {number} timeout - Timeout in ms
  * @returns {Promise<string>}
  */
-function runClawdbot(message, timeout = CLAWDBOT_TIMEOUT) {
+function runOpenclaw(message, timeout = OPENCLAW_TIMEOUT) {
   return new Promise((resolve, reject) => {
     const args = ['agent', '--local', '--json', '--session-id', 'rtms-meeting-assistant', '--message', message];
-    execFile(CLAWDBOT_BIN, args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(OPENCLAW_BIN, args, { timeout, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
-        console.error('❌ Clawdbot error:', err.message);
+        console.error('❌ OpenClaw error:', err.message);
         if (stderr) console.error('stderr:', stderr);
         return reject(err);
       }
       try {
         const result = JSON.parse(stdout);
-        // clawdbot agent --json returns { payloads: [{ text }], meta: { ... } }
+        // openclaw agent --json returns { payloads: [{ text }], meta: { ... } }
         if (result.payloads && Array.isArray(result.payloads)) {
           const text = result.payloads.map(p => p.text).filter(Boolean).join('\n');
           resolve(text || stdout.trim());
@@ -70,9 +70,9 @@ function runClawdbot(message, timeout = CLAWDBOT_TIMEOUT) {
 }
 
 /**
- * Sends a message to Clawdbot agent for processing
+ * Sends a message to OpenClaw agent for processing
  * @param {string} message - The user message
- * @param {string} _model - Ignored (uses Clawdbot's configured model)
+ * @param {string} _model - Ignored (uses OpenClaw's configured model)
  * @param {string[]} images - Base64 images (passed as context in prompt)
  * @param {boolean} isRetry - Whether this is a retry
  * @returns {Promise<string>}
@@ -82,19 +82,19 @@ export async function chatWithClawdbot(message, _model = '', images = [], isRetr
     let fullMessage = message;
 
     // If images are provided, mention them in the prompt
-    // (Clawdbot agent can process text but images need to be described)
+    // (OpenClaw agent can process text but images need to be described)
     if (images.length > 0) {
       fullMessage += `\n\n[Note: ${images.length} image(s) were captured from screen share but cannot be passed directly. Please analyze based on the text/transcript content provided.]`;
     }
 
-    console.log('🤖 Sending to Clawdbot agent...');
-    const response = await runClawdbot(fullMessage);
+    console.log('🤖 Sending to OpenClaw agent...');
+    const response = await runOpenclaw(fullMessage);
     return response;
   } catch (err) {
-    console.error('❌ Error with Clawdbot:', err.message);
+    console.error('❌ Error with OpenClaw:', err.message);
 
     if (!isRetry) {
-      console.log('🔄 Retrying Clawdbot...');
+      console.log('🔄 Retrying OpenClaw...');
       return await chatWithClawdbot(message, _model, images, true);
     }
 
@@ -103,16 +103,16 @@ export async function chatWithClawdbot(message, _model = '', images = [], isRetr
 }
 
 /**
- * Fast/lightweight chat (same as regular for Clawdbot — no separate fast model)
+ * Fast/lightweight chat (same as regular for OpenClaw — no separate fast model)
  * @param {string} message
  * @returns {Promise<string>}
  */
 export async function chatWithClawdbotFast(message) {
   try {
-    console.log('🤖 Sending to Clawdbot agent (fast)...');
-    return await runClawdbot(message);
+    console.log('🤖 Sending to OpenClaw agent (fast)...');
+    return await runOpenclaw(message);
   } catch (err) {
-    console.error('❌ Error with Clawdbot:', err.message);
+    console.error('❌ Error with OpenClaw:', err.message);
     throw err;
   }
 }
@@ -127,8 +127,8 @@ export async function generateDialogSuggestions(transcript) {
      const dialogPromptTemplate = readFileSync(join(__dirname, 'query_prompt_dialog_suggestions.md'), 'utf-8');
     const filledPrompt = dialogPromptTemplate.replace(/\{\{meeting_transcript\}\}/g, transcript);
 
-    console.log('🗣️ Generating dialog suggestions via Clawdbot...');
-    const response = await runClawdbot(filledPrompt);
+    console.log('🗣️ Generating dialog suggestions via OpenClaw...');
+    const response = await runOpenclaw(filledPrompt);
 
     const suggestions = response
       .split('\n')
@@ -158,8 +158,8 @@ export async function analyzeSentiment(transcript) {
      const sentimentPromptTemplate = readFileSync(join(__dirname, 'query_prompt_sentiment_analysis.md'), 'utf-8');
     const filledPrompt = sentimentPromptTemplate.replace(/\{\{meeting_transcript\}\}/g, transcript);
 
-    console.log('😊 Analyzing sentiment via Clawdbot...');
-    const response = await runClawdbot(filledPrompt);
+    console.log('😊 Analyzing sentiment via OpenClaw...');
+    const response = await runOpenclaw(filledPrompt);
 
     let jsonContent = response.trim();
     if (jsonContent.startsWith('```json')) {
@@ -203,7 +203,7 @@ export async function generateRealTimeSummary(transcript, meetingEvents = '', im
       .replace(/\{\{stream_id\}\}/g, streamId)
       .replace(/\{\{TODAYDATE\}\}/g, todayDate);
 
-    console.log('📝 Generating real-time summary via Clawdbot...');
+    console.log('📝 Generating real-time summary via OpenClaw...');
     const response = await chatWithClawdbot(filledPrompt, '', imageBase64Array);
 
     console.log('✅ Real-time summary generated');
@@ -227,8 +227,8 @@ export async function queryCurrentMeeting(transcript, userQuery) {
       .replace(/\{\{meeting_transcript\}\}/g, transcript)
       .replace(/\{\{user_query\}\}/g, userQuery);
 
-    console.log('🔍 Querying current meeting via Clawdbot...');
-    const response = await runClawdbot(filledPrompt);
+    console.log('🔍 Querying current meeting via OpenClaw...');
+    const response = await runOpenclaw(filledPrompt);
 
     console.log('✅ Meeting query answered');
     return response;

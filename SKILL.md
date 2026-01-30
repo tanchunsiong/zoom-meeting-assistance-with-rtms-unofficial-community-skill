@@ -5,7 +5,7 @@ description: Zoom RTMS Meeting Assistant — start on-demand to capture meeting 
 
 # Zoom RTMS Meeting Assistant
 
-Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via Clawdbot.
+Headless capture service for Zoom meetings using Real-Time Media Streams (RTMS). Receives webhook events, connects to RTMS WebSockets, records all media, and runs AI analysis via OpenClaw.
 
 ## Webhook Events Handled
 
@@ -45,8 +45,8 @@ Set these in the skill's `.env` file:
 - `AI_PROCESSING_INTERVAL_MS` — AI analysis frequency in ms (default: `30000`)
 - `AI_FUNCTION_STAGGER_MS` — Delay between AI calls in ms (default: `5000`)
 - `AUDIO_DATA_OPT` — `1` = mixed stream, `2` = multi-stream (default: `2`)
-- `CLAWDBOT_NOTIFY_CHANNEL` — Notification channel (default: `whatsapp`)
-- `CLAWDBOT_NOTIFY_TARGET` — Phone number / target for notifications
+- `OPENCLAW_NOTIFY_CHANNEL` — Notification channel (default: `whatsapp`)
+- `OPENCLAW_NOTIFY_TARGET` — Phone number / target for notifications
 
 ## Starting the Service
 

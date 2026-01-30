@@ -13,9 +13,9 @@
     "transcript",
     "ai",
     "assistant",
-    "clawdbot"
+    "openclaw"
   ],
-  "clawdbot": {
+  "openclaw": {
     "emoji": "🎙️",
     "webhookEvents": ["meeting.rtms_started", "meeting.rtms_stopped"],
     "forwardPort": 4048,

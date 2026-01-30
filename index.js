@@ -23,7 +23,7 @@ import { sanitizeFileName, getRecordingsPath } from './tool.js';
 import { convertMeetingMedia } from './convertMeetingMedia.js';
 import { muxMixedAudioAndActiveSpeakerVideo } from './muxMixedAudioAndActiveSpeakerVideo.js';
 
-// Import Clawdbot AI functions
+// Import OpenClaw AI functions
 import { chatWithClawdbot, chatWithClawdbotFast, generateDialogSuggestions, analyzeSentiment, generateRealTimeSummary, queryCurrentMeeting, notifyUser } from './chatWithClawdbot.js';
 
 // Load environment variables from a .env file
